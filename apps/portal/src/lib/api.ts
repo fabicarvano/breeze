@@ -742,6 +742,7 @@ export interface BrandingConfig {
   enableService?: boolean;
   enableDocuments?: boolean;
   enableLifecycle?: boolean;
+  enableNetworkVisibility?: boolean;
 }
 
 export interface ListParams {
