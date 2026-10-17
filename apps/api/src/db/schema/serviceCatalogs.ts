@@ -8,13 +8,18 @@ import {
   index,
   uniqueIndex,
   check,
+  integer,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { organizations, partners } from './orgs';
+import { ticketCategories } from './tickets';
+import { ticketForms } from './ticketForms';
+import { workTypes } from './workTypes';
 
 /**
  * Service catalog foundation, R1 (#8325).
- * Migration: 2026-12-28-120000-service-catalog-foundation.sql.
+ * Migrations: 2026-12-28-120000-service-catalog-foundation.sql (ownership),
+ * 2026-12-29-150000-service-catalog-item-config.sql (item configuration).
  * Spec: docs/superpowers/specs/ticketing/2026-10-10-service-catalog-design.md §6.1.
  *
  * Config-ish dual-axis tables: exactly one of `partner_id` / `org_id` is set
@@ -48,7 +53,26 @@ export const serviceCatalogItems = pgTable('service_catalog_items', {
   orgId: uuid('org_id').references(() => organizations.id, { onDelete: 'cascade' }),
   name: varchar('name', { length: 255 }).notNull(),
   description: text('description'),
+  // Descriptive grouping (pillar -> service line -> activity); no taxonomy tables.
+  pillar: varchar('pillar', { length: 120 }),
+  serviceLine: varchar('service_line', { length: 120 }),
+  // incident | service_request | problem | change. Descriptive only until #7900.
+  itilClass: varchar('itil_class', { length: 20 }),
+  // remote | onsite | hybrid. Informational only.
+  delivery: varchar('delivery', { length: 20 }),
+  // Optional pair: response | resolution + positive minutes. Both NULL = inherit.
+  slaTargetKind: varchar('sla_target_kind', { length: 20 }),
+  slaTargetMinutes: integer('sla_target_minutes'),
+  // Typing only: SQL has composite same-partner FKs (form_id/category_id/work_type_id,
+  // partner_id), DEFERRABLE, ON DELETE SET NULL (<column>).
+  formId: uuid('form_id').references(() => ticketForms.id),
+  categoryId: uuid('category_id').references(() => ticketCategories.id),
+  workTypeId: uuid('work_type_id').references(() => workTypes.id),
   isActive: boolean('is_active').notNull().default(true),
+  // Starts hidden until explicitly published.
+  showInPortal: boolean('show_in_portal').notNull().default(false),
+  sortOrder: integer('sort_order').notNull().default(0),
+  version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
