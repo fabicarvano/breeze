@@ -522,3 +522,13 @@ export type NetworkAssetsDto =
       data: [];
       pagination: PaginationDto;
     };
+
+/**
+ * Single-asset detail (CPEV-W3). `data` is exactly the row the list returns for
+ * the same asset under the same flags; null unless `dataStatus` is 'ok'. A
+ * missing asset is a 404, not an empty result, so there is no `no_data`.
+ */
+export interface NetworkAssetDetailDto {
+  dataStatus: 'ok' | 'not_enabled';
+  data: NetworkAssetRowDto | null;
+}

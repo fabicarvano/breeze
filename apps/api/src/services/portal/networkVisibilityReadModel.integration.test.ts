@@ -1,5 +1,5 @@
 import '../../__tests__/integration/setup';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
 import { withDbAccessContext, withSystemDbAccessContext, type DbAccessContext } from '../../db';
@@ -19,10 +19,17 @@ import {
   createSite,
 } from '../../__tests__/integration/db-utils';
 import { getTestDb } from '../../__tests__/integration/setup';
-import { networkAssets, networkOverview, networkSiteHealth, networkSites } from './networkVisibilityReadModel';
+import { networkAssetDetail, networkAssets, networkOverview, networkSiteHealth, networkSites } from './networkVisibilityReadModel';
 import { assetPhysicalPlacements } from '../../db/schema';
 import { createDevice } from '../../__tests__/integration/db-utils';
 import { placementKey, readPlacement, readPlacements, resolvePlacementAuthority, resolvePlacementAuthorities } from '../assetPlacement';
+
+// Wrap (not replace) the real loader so one test can make it fail.
+vi.mock('../assetReachabilityLoader', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../assetReachabilityLoader')>();
+  return { ...actual, loadReachability: vi.fn(actual.loadReachability) };
+});
+import { loadReachability } from '../assetReachabilityLoader';
 
 const NOW = new Date('2026-09-17T12:00:00.000Z');
 
@@ -1285,5 +1292,158 @@ describe('networkSiteHealth (CPEV-W2, real Postgres)', () => {
     const org = await createOrganization({ partnerId: partner.id });
     const result = await withDbAccessContext(orgContext(org.id, partner.id), () => networkSiteHealth(org.id, true, NOW));
     expect(result).toEqual({ dataStatus: 'no_data', data: [] });
+  });
+});
+
+describe('networkAssetDetail (CPEV-W3, real Postgres)', () => {
+  const ROW_KEYS = [
+    'assetType', 'firstSeenAt', 'hostname', 'id', 'ipAddress', 'label', 'lastSeenAt',
+    'macAddress', 'manufacturer', 'model', 'onlineState', 'siteName',
+  ];
+  const ALERT_KEYS = ['activeAlertCount', 'highestAlertSeverity', 'openTicketCount'];
+
+  async function seed() {
+    const testDb = getTestDb();
+    const partner = await createPartner();
+    const orgA = await createOrganization({ partnerId: partner.id });
+    const orgB = await createOrganization({ partnerId: partner.id });
+    const siteA1 = await createSite({ orgId: orgA.id, name: 'Site A1' });
+    const siteA2 = await createSite({ orgId: orgA.id, name: 'Site A2' });
+    const siteB = await createSite({ orgId: orgB.id, name: 'Site B' });
+    const fresh = new Date('2026-09-17T11:59:00.000Z');
+    const base = { source: 'manual' as const, assetType: 'switch' as const, statusSource: 'scan' as const };
+
+    const [online, offline, unverified, otherSite, dismissed] = await testDb.insert(discoveredAssets).values([
+      {
+        ...base, orgId: orgA.id, siteId: siteA1.id, ipAddress: '10.60.0.1', hostname: 'a-online',
+        isOnline: true, statusObservedAt: fresh, lastSeenAt: fresh,
+        // Sensitive source columns that must never reach the DTO.
+        netbiosName: 'SECRET-NETBIOS',
+        openPorts: [{ port: 31337, service: 'SECRET-PORT-SERVICE' }],
+        osFingerprint: { os: 'SECRET-FINGERPRINT' },
+        snmpData: { sysDescr: 'SECRET-SNMP-DESCR', community: 'SECRET-COMMUNITY' },
+        lastProbeRef: 'SECRET-PROBE-REF',
+      },
+      { ...base, orgId: orgA.id, siteId: siteA1.id, ipAddress: '10.60.0.2', hostname: 'a-offline',
+        isOnline: false, statusObservedAt: fresh, lastSeenAt: new Date('2026-09-17T11:00:00.000Z') },
+      { ...base, orgId: orgA.id, siteId: siteA1.id, ipAddress: '10.60.0.3', hostname: 'a-unverified',
+        isOnline: false, statusObservedAt: new Date('2026-09-15T10:00:00.000Z'), lastSeenAt: new Date('2026-09-15T10:00:00.000Z') },
+      { ...base, orgId: orgA.id, siteId: siteA2.id, ipAddress: '10.60.1.1', hostname: 'a-other-site',
+        isOnline: true, statusObservedAt: fresh, lastSeenAt: fresh },
+      { ...base, orgId: orgA.id, siteId: siteA1.id, ipAddress: '10.60.0.9', hostname: 'a-dismissed',
+        approvalStatus: 'dismissed' as const, isOnline: true, statusObservedAt: fresh, lastSeenAt: fresh },
+    ]).returning();
+    const [assetB] = await testDb.insert(discoveredAssets).values([
+      { ...base, orgId: orgB.id, siteId: siteB.id, ipAddress: '10.60.2.1', hostname: 'b-online',
+        isOnline: true, statusObservedAt: fresh, lastSeenAt: fresh },
+    ]).returning();
+
+    // Monitor config + alert context on the online asset.
+    const [monitor] = await testDb.insert(networkMonitors).values({
+      orgId: orgA.id, assetId: online!.id, name: 'Detail monitor', monitorType: 'icmp_ping',
+      target: '10.60.0.1', isActive: true, lastStatus: 'online',
+      config: { secret: 'SECRET-MONITOR-CONFIG', threshold: 4242 },
+    }).returning();
+    const device = await createDevice({ orgId: orgA.id, siteId: siteA1.id });
+    await testDb.insert(alerts).values({
+      deviceId: device.id, orgId: orgA.id, severity: 'high', status: 'active',
+      title: 'Detail alert',
+      context: { source: 'network_monitor', monitorId: monitor!.id, note: 'SECRET-ALERT-CONTEXT' },
+    });
+
+    await testDb.insert(assetPhysicalPlacements).values([
+      { orgId: orgA.id, discoveredAssetId: online!.id, room: 'Room 1', rack: 'R1', rackUnit: 4, heightU: 2 },
+      { orgId: orgB.id, discoveredAssetId: assetB!.id, room: 'B-SECRET-ROOM', rack: 'B-RACK', rackUnit: 9, heightU: 9 },
+    ]);
+
+    return { partner, orgA, orgB, online: online!, offline: offline!, unverified: unverified!, otherSite: otherSite!, dismissed: dismissed!, assetB: assetB! };
+  }
+
+  const detail = (orgId: string, partnerId: string, id: string, alertsOn = false, placementOn = false) =>
+    withDbAccessContext(orgContext(orgId, partnerId), () => networkAssetDetail(orgId, id, alertsOn, placementOn, NOW));
+
+  it('A→A, B→B, A↛B, B↛A; a forged other-org id equals a random uuid; dismissed is hidden', async () => {
+    const { partner, orgA, orgB, online, assetB, dismissed } = await seed();
+
+    expect((await detail(orgA.id, partner.id, online.id))?.hostname).toBe('a-online');
+    expect((await detail(orgB.id, partner.id, assetB.id))?.hostname).toBe('b-online');
+    expect(await detail(orgB.id, partner.id, online.id)).toBeNull();
+    expect(await detail(orgA.id, partner.id, assetB.id)).toBeNull();
+    expect(await detail(orgA.id, partner.id, randomUUID())).toBeNull();
+    expect(await detail(orgA.id, partner.id, dismissed.id)).toBeNull();
+  });
+
+  it('reads an asset of another site of the same org and shapes siteName from the join', async () => {
+    const { partner, orgA, otherSite } = await seed();
+    const row = await detail(orgA.id, partner.id, otherSite.id);
+    expect(row).toMatchObject({ hostname: 'a-other-site', siteName: 'Site A2', onlineState: 'online' });
+  });
+
+  it('exposes exactly the NetworkAssetRowDto keys and none of the sensitive source values', async () => {
+    const { partner, orgA, online } = await seed();
+
+    const off = await detail(orgA.id, partner.id, online.id);
+    expect(Object.keys(off!).sort()).toEqual(ROW_KEYS);
+
+    const on = await detail(orgA.id, partner.id, online.id, true, true);
+    expect(Object.keys(on!).sort()).toEqual([...ROW_KEYS, ...ALERT_KEYS, 'physicalPlacement'].sort());
+    expect(on).toMatchObject({ activeAlertCount: 1, highestAlertSeverity: 'high', openTicketCount: 0 });
+    expect(Object.keys(on!.physicalPlacement!).sort()).toEqual(['heightU', 'rack', 'rackUnit', 'room', 'siteName']);
+
+    const serialized = JSON.stringify([off, on]);
+    for (const leaked of [
+      'SECRET-NETBIOS', 'SECRET-PORT-SERVICE', '31337', 'SECRET-FINGERPRINT', 'SECRET-SNMP-DESCR',
+      'SECRET-COMMUNITY', 'SECRET-PROBE-REF', 'SECRET-MONITOR-CONFIG', '4242', 'SECRET-ALERT-CONTEXT',
+      'B-SECRET-ROOM', 'siteId', 'orgId', 'linkedDeviceId',
+    ]) {
+      expect(serialized).not.toContain(leaked);
+    }
+  });
+
+  it('omits alert keys and placement with the flags off; zero-fills alerts when on and the asset has none', async () => {
+    const { partner, orgA, offline } = await seed();
+
+    const off = await detail(orgA.id, partner.id, offline.id, false, false);
+    for (const key of [...ALERT_KEYS, 'physicalPlacement']) expect(off).not.toHaveProperty(key);
+
+    const on = await detail(orgA.id, partner.id, offline.id, true, true);
+    expect(on).toMatchObject({ activeAlertCount: 0, highestAlertSeverity: null, openTicketCount: 0 });
+    // No placement row: omitted, never null-filled.
+    expect(on).not.toHaveProperty('physicalPlacement');
+  });
+
+  it('derives onlineState like the list: unverified stays null, never offline', async () => {
+    const { partner, orgA, online, offline, unverified } = await seed();
+    expect((await detail(orgA.id, partner.id, online.id))?.onlineState).toBe('online');
+    expect((await detail(orgA.id, partner.id, offline.id))?.onlineState).toBe('offline');
+    expect((await detail(orgA.id, partner.id, unverified.id))?.onlineState).toBeNull();
+  });
+
+  it('never turns a reachability failure into an ok row', async () => {
+    const { partner, orgA, online } = await seed();
+    vi.mocked(loadReachability).mockRejectedValueOnce(new Error('reachability source down'));
+    await expect(detail(orgA.id, partner.id, online.id)).rejects.toThrow('reachability source down');
+  });
+
+  it.each([
+    ['alerts off, placement off', false, false],
+    ['alerts on, placement off', true, false],
+    ['alerts off, placement on', false, true],
+    ['alerts on, placement on', true, true],
+  ])('equals the list row for the same asset in both list branches (%s)', async (_name, alertsOn, placementOn) => {
+    const { partner, orgA } = await seed();
+
+    for (const status of [undefined, 'online', 'offline', 'unverified'] as const) {
+      const list = await withDbAccessContext(orgContext(orgA.id, partner.id), () =>
+        networkAssets(orgA.id, { status, limit: 500 }, NOW, alertsOn, placementOn));
+      if (list.dataStatus !== 'ok') throw new Error('expected ok');
+      if (status === undefined) expect(list.data).toHaveLength(4);
+      expect(status === undefined || list.data.length > 0).toBe(true);
+
+      for (const row of list.data) {
+        const one = await detail(orgA.id, partner.id, row.id, alertsOn, placementOn);
+        expect(one).toEqual(row);
+      }
+    }
   });
 });

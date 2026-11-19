@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import type { SQL } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';
 
-const { dbState, dbAccessContexts, networkOverviewMock, networkAssetsMock, networkSitesMock, networkSiteHealthMock } = vi.hoisted(() => ({
+const { dbState, dbAccessContexts, networkOverviewMock, networkAssetsMock, networkSitesMock, networkSiteHealthMock, networkAssetDetailMock } = vi.hoisted(() => ({
   dbState: {
     rows: [] as unknown[],
     where: undefined as unknown,
@@ -14,6 +14,7 @@ const { dbState, dbAccessContexts, networkOverviewMock, networkAssetsMock, netwo
   networkAssetsMock: vi.fn(),
   networkSitesMock: vi.fn(),
   networkSiteHealthMock: vi.fn(),
+  networkAssetDetailMock: vi.fn(),
 }));
 
 vi.mock('../../db', () => {
@@ -64,6 +65,7 @@ vi.mock('../../services/portal/networkVisibilityReadModel', () => ({
   networkAssets: networkAssetsMock,
   networkSites: networkSitesMock,
   networkSiteHealth: networkSiteHealthMock,
+  networkAssetDetail: networkAssetDetailMock,
 }));
 
 import { portalNetworkRoutes } from './network';
@@ -501,5 +503,167 @@ describe('GET /network/sites/health (CPEV-W2)', () => {
     const response = await makeApp(false).request('/network/sites/health');
     expect(response.status).toBe(401);
     expect(networkSiteHealthMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('GET /network/assets/:id (CPEV-W3)', () => {
+  const ASSET_ID = '0a1b2c3d-1111-4222-8333-444455556666';
+  const ROW = {
+    id: ASSET_ID,
+    hostname: 'sw-1',
+    label: null,
+    ipAddress: '10.0.0.2',
+    macAddress: null,
+    assetType: 'switch',
+    onlineState: 'online',
+    lastSeenAt: '2026-09-17T11:00:00.000Z',
+    firstSeenAt: '2026-09-01T11:00:00.000Z',
+    manufacturer: null,
+    model: null,
+    siteName: 'HQ',
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    dbState.rows = [];
+    dbState.where = undefined;
+    dbState.contextDepth = 0;
+    dbAccessContexts.length = 0;
+    networkAssetDetailMock.mockResolvedValue(ROW);
+  });
+
+  function enable(extra: Record<string, boolean> = {}) {
+    dbState.rows = [{ enableNetworkVisibility: true, ...extra }];
+  }
+
+  it.each([
+    ['absent', []],
+    ['false', [{ enableNetworkVisibility: false }]],
+  ])('answers not_enabled before any lookup when the flag is %s', async (_n, rows) => {
+    dbState.rows = rows;
+
+    const response = await makeApp().request(`/network/assets/${ASSET_ID}`);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ dataStatus: 'not_enabled', data: null });
+    expect(response.headers.get('etag')).toBeTruthy();
+    expect(networkAssetDetailMock).not.toHaveBeenCalled();
+  });
+
+  it('returns the asset in the authenticated org when the flag is true', async () => {
+    enable();
+
+    const response = await makeApp().request(`/network/assets/${ASSET_ID}`);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ dataStatus: 'ok', data: ROW });
+    expect(response.headers.get('etag')).toBeTruthy();
+    expect(response.headers.get('cache-control')).toContain('private');
+    expect(networkAssetDetailMock).toHaveBeenCalledWith(ORG_ID, ASSET_ID, false, false);
+    expect(dbAccessContexts).toEqual([
+      {
+        scope: 'organization',
+        orgId: ORG_ID,
+        accessibleOrgIds: [ORG_ID],
+        accessiblePartnerIds: [],
+        userId: null,
+        currentPartnerId: PARTNER_ID,
+      },
+    ]);
+  });
+
+  it.each([
+    [{}, false, false],
+    [{ enableNetworkAlerts: true }, true, false],
+    [{ enablePhysicalPlacement: true }, false, true],
+    [{ enableNetworkAlerts: true, enablePhysicalPlacement: true }, true, true],
+  ])('passes the alert and placement flags through (%j)', async (flags, alerts, placement) => {
+    enable(flags);
+
+    await makeApp().request(`/network/assets/${ASSET_ID}`);
+
+    expect(networkAssetDetailMock).toHaveBeenCalledWith(ORG_ID, ASSET_ID, alerts, placement);
+  });
+
+  it('serves the row exactly as the read model shaped it (alerts off, no placement)', async () => {
+    enable();
+
+    const body = await (await makeApp().request(`/network/assets/${ASSET_ID}`)).json() as { data: Record<string, unknown> };
+
+    expect(body.data).not.toHaveProperty('activeAlertCount');
+    expect(body.data).not.toHaveProperty('highestAlertSeverity');
+    expect(body.data).not.toHaveProperty('openTicketCount');
+    expect(body.data).not.toHaveProperty('physicalPlacement');
+  });
+
+  it('serves zero-filled alerts when the read model supplies them', async () => {
+    enable({ enableNetworkAlerts: true });
+    networkAssetDetailMock.mockResolvedValue({ ...ROW, activeAlertCount: 0, highestAlertSeverity: null, openTicketCount: 0 });
+
+    const body = await (await makeApp().request(`/network/assets/${ASSET_ID}`)).json() as { data: Record<string, unknown> };
+
+    expect(body.data).toMatchObject({ activeAlertCount: 0, highestAlertSeverity: null, openTicketCount: 0 });
+  });
+
+  it('answers 403 without a partnerId, before any read', async () => {
+    const app = new Hono();
+    app.use('*', async (c, next) => {
+      c.set('portalAuth', { user: { id: 'pu1', orgId: ORG_ID }, token: 't', authMethod: 'bearer', partnerId: null });
+      await next();
+    });
+    app.route('/', portalNetworkRoutes);
+
+    const response = await app.request(`/network/assets/${ASSET_ID}`);
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'Organization is not available' });
+    expect(networkAssetDetailMock).not.toHaveBeenCalled();
+    expect(dbAccessContexts).toEqual([]);
+  });
+
+  it('answers 400 for a malformed id, uncached, before the gate', async () => {
+    enable();
+
+    const response = await makeApp().request('/network/assets/not-a-uuid');
+
+    expect(response.status).toBe(400);
+    expect(response.headers.get('etag')).toBeNull();
+    expect(response.headers.get('cache-control') ?? '').not.toContain('private, max-age');
+    expect(networkAssetDetailMock).not.toHaveBeenCalled();
+    expect(dbAccessContexts).toEqual([]);
+  });
+
+  it('answers a uniform uncached 404 when the asset is not found', async () => {
+    enable();
+    networkAssetDetailMock.mockResolvedValue(null);
+
+    const response = await makeApp().request(`/network/assets/${ASSET_ID}`);
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: 'Asset not found' });
+    expect(response.headers.get('etag')).toBeNull();
+    expect(response.headers.get('cache-control') ?? '').not.toContain('max-age=30');
+  });
+
+  it('ignores orgId and siteId in the query string', async () => {
+    enable();
+
+    await makeApp().request(
+      `/network/assets/${ASSET_ID}?orgId=99999999-9999-4999-8999-999999999999&siteId=88888888-8888-4888-8888-888888888888`,
+    );
+
+    expect(networkAssetDetailMock).toHaveBeenCalledWith(ORG_ID, ASSET_ID, false, false);
+    expect(dbAccessContexts[0]).toMatchObject({ orgId: ORG_ID });
+  });
+
+  it('does not shadow the list route', async () => {
+    enable();
+    networkAssetsMock.mockResolvedValue({ dataStatus: 'no_data', data: [], pagination: { page: 1, limit: 50, total: 0 } });
+
+    const response = await makeApp().request('/network/assets');
+
+    expect(response.status).toBe(200);
+    expect(networkAssetsMock).toHaveBeenCalledTimes(1);
+    expect(networkAssetDetailMock).not.toHaveBeenCalled();
   });
 });

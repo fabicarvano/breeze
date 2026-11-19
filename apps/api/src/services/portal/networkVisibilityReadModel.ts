@@ -704,6 +704,60 @@ export async function networkAssets(
   };
 }
 
+/**
+ * CPEV-W3: one asset of the organization, shaped by the same toAssetRow() and
+ * withPhysicalPlacement() as the list. Null when the id does not exist in the
+ * org or is dismissed; the route answers both with the same 404.
+ */
+export async function networkAssetDetail(
+  orgId: string,
+  assetId: string,
+  enrichWithAlerts = false,
+  includePhysicalPlacement = false,
+  now: Date = new Date(),
+): Promise<NetworkAssetRowDto | null> {
+  const [row] = await db
+    .select({
+      id: discoveredAssets.id,
+      hostname: discoveredAssets.hostname,
+      label: discoveredAssets.label,
+      ipAddress: discoveredAssets.ipAddress,
+      macAddress: discoveredAssets.macAddress,
+      assetType: discoveredAssets.assetType,
+      lastSeenAt: discoveredAssets.lastSeenAt,
+      firstSeenAt: discoveredAssets.firstSeenAt,
+      manufacturer: discoveredAssets.manufacturer,
+      model: discoveredAssets.model,
+      siteName: sites.name,
+      // Only for the placement lookup; never part of the DTO.
+      siteId: discoveredAssets.siteId,
+    })
+    .from(discoveredAssets)
+    .innerJoin(sites, eq(discoveredAssets.siteId, sites.id))
+    .where(and(
+      eq(discoveredAssets.orgId, orgId),
+      eq(discoveredAssets.id, assetId),
+      ne(discoveredAssets.approvalStatus, 'dismissed'),
+    ))
+    .limit(1);
+
+  if (!row) return null;
+
+  const reachabilityByAsset = await loadReachability([row.id], now);
+  const alertEnrichmentByAsset = enrichWithAlerts
+    ? await loadNetworkAssetAlertEnrichment(orgId, [row.id])
+    : undefined;
+  const placementByAsset = includePhysicalPlacement
+    ? await loadPhysicalPlacements(orgId, [{ id: row.id, siteId: row.siteId }])
+    : undefined;
+
+  return withPhysicalPlacement(toAssetRow(
+    row,
+    reachabilityByAsset.get(row.id),
+    enrichWithAlerts ? (alertEnrichmentByAsset?.get(row.id) ?? ZERO_ALERT_ENRICHMENT) : undefined,
+  ), placementByAsset?.get(row.id));
+}
+
 /** Adds the placement block only when one exists; never a null or placeholder. */
 function withPhysicalPlacement(row: NetworkAssetRowDto, placement: PhysicalPlacementDto | undefined): NetworkAssetRowDto {
   if (placement) row.physicalPlacement = placement;

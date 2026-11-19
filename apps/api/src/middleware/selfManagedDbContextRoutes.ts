@@ -194,6 +194,11 @@ const SELF_MANAGED_DB_CONTEXT_ROUTES: readonly SelfManagedRoute[] = [
   // #5861 PR 2: the per-asset list opens the same org-scoped context as the
   // overview, so it must opt out of the portal request transaction too.
   { method: 'GET', pattern: /^\/api\/v1\/portal\/network\/assets\/?$/ },
+  // CPEV-W3: the per-asset detail opens the same org-scoped context. UUID-shaped
+  // so `/network/assets/extra` still keeps the ambient transaction. HEAD runs
+  // the GET handler (Hono), so it opts out with it.
+  { method: 'GET', pattern: /^\/api\/v1\/portal\/network\/assets\/[0-9a-f-]{36}\/?$/i },
+  { method: 'HEAD', pattern: /^\/api\/v1\/portal\/network\/assets\/[0-9a-f-]{36}\/?$/i },
   // CPEV-W2: the site filter options and the per-site health summary open the
   // same org-scoped context (with currentPartnerId) as the overview, so they
   // opt out too; otherwise the portal auth context (currentPartnerId null)

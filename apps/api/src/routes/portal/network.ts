@@ -1,11 +1,11 @@
-import type { NetworkOverviewDto, NetworkAssetsDto, NetworkSitesDto, NetworkSiteHealthDto } from '@breeze/shared';
+import type { NetworkOverviewDto, NetworkAssetsDto, NetworkAssetDetailDto, NetworkSitesDto, NetworkSiteHealthDto } from '@breeze/shared';
 import { eq } from 'drizzle-orm';
 import { zValidator } from '../../lib/validation';
 import { Hono } from 'hono';
 import { db, withDbAccessContext, type DbAccessContext } from '../../db';
 import { portalBranding } from '../../db/schema';
-import { networkAssets, networkOverview, networkSiteHealth, networkSites } from '../../services/portal/networkVisibilityReadModel';
-import { networkAssetsQuerySchema } from './schemas';
+import { networkAssetDetail, networkAssets, networkOverview, networkSiteHealth, networkSites } from '../../services/portal/networkVisibilityReadModel';
+import { assetParamSchema, networkAssetsQuerySchema } from './schemas';
 import {
   applyPortalCacheHeaders,
   buildWeakEtag,
@@ -39,7 +39,7 @@ function portalOrgContext(
 
 function cached(
   c: Parameters<typeof applyPortalCacheHeaders>[0],
-  payload: NetworkOverviewDto | NetworkAssetsDto | NetworkSitesDto | NetworkSiteHealthDto,
+  payload: NetworkOverviewDto | NetworkAssetsDto | NetworkAssetDetailDto | NetworkSitesDto | NetworkSiteHealthDto,
 ) {
   applyPortalCacheHeaders(c, {
     scope: 'private',
@@ -247,6 +247,64 @@ portalNetworkRoutes.get(
         );
 
         return cached(c, result);
+      },
+    );
+  },
+);
+
+// CPEV-W3: one asset. Registered after the list; the list path has no :id so
+// the two never collide.
+portalNetworkRoutes.get(
+  '/network/assets/:id',
+  zValidator('param', assetParamSchema),
+  async (c) => {
+    const auth = c.get('portalAuth');
+
+    if (!auth) {
+      return c.json({ error: 'Authentication required' }, 401);
+    }
+
+    const orgId = auth.user.orgId;
+    const partnerId = auth.partnerId;
+
+    if (!partnerId) {
+      return c.json({ error: 'Organization is not available' }, 403);
+    }
+
+    // The id is only a selector inside the authenticated org; nothing else is read from the request.
+    const { id } = c.req.valid('param');
+
+    return withDbAccessContext(
+      portalOrgContext(orgId, partnerId),
+      async () => {
+        const [settings] = await db
+          .select({
+            enableNetworkVisibility: portalBranding.enableNetworkVisibility,
+            enableNetworkAlerts: portalBranding.enableNetworkAlerts,
+            enablePhysicalPlacement: portalBranding.enablePhysicalPlacement,
+          })
+          .from(portalBranding)
+          .where(eq(portalBranding.orgId, orgId))
+          .limit(1);
+
+        // Gate before any lookup so an org without the flag cannot probe ids.
+        if (settings?.enableNetworkVisibility !== true) {
+          return cached(c, { dataStatus: 'not_enabled', data: null });
+        }
+
+        const asset = await networkAssetDetail(
+          orgId,
+          id,
+          settings.enableNetworkAlerts === true,
+          settings.enablePhysicalPlacement === true,
+        );
+
+        // Unknown, other-org and dismissed ids are indistinguishable; not cached.
+        if (!asset) {
+          return c.json({ error: 'Asset not found' }, 404);
+        }
+
+        return cached(c, { dataStatus: 'ok', data: asset });
       },
     );
   },
