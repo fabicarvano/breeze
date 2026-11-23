@@ -30,7 +30,8 @@ var sweepLegacyAutoStart = runtime.GOOS == "windows"
 
 // Settings mirrors the API HelperSettings shape.
 type Settings struct {
-	Enabled bool `json:"enabled" yaml:"-"`
+	Branding *Branding `json:"branding,omitempty" yaml:"-"`
+	Enabled  bool      `json:"enabled" yaml:"-"`
 	// ShowTrayIcon controls whether Breeze Assist draws its system-tray icon.
 	// Independent of Enabled: the helper still serves chat, remote-access
 	// consent and PAM dialogs with the icon hidden (#3202). Callers must
@@ -47,14 +48,15 @@ const watcherStopTimeout = 2 * time.Second
 
 // Config is the YAML shape written to helper_config.yaml.
 type Config struct {
-	ShowTrayIcon       bool   `yaml:"show_tray_icon"`
-	ShowOpenPortal     bool   `yaml:"show_open_portal"`
-	ShowDeviceInfo     bool   `yaml:"show_device_info"`
-	ShowRequestSupport bool   `yaml:"show_request_support"`
-	PortalUrl          string `yaml:"portal_url,omitempty"`
-	DeviceName         string `yaml:"device_name,omitempty"`
-	DeviceStatus       string `yaml:"device_status,omitempty"`
-	LastCheckin        string `yaml:"last_checkin,omitempty"`
+	Branding           *Branding `yaml:"branding,omitempty"`
+	ShowTrayIcon       bool      `yaml:"show_tray_icon"`
+	ShowOpenPortal     bool      `yaml:"show_open_portal"`
+	ShowDeviceInfo     bool      `yaml:"show_device_info"`
+	ShowRequestSupport bool      `yaml:"show_request_support"`
+	PortalUrl          string    `yaml:"portal_url,omitempty"`
+	DeviceName         string    `yaml:"device_name,omitempty"`
+	DeviceStatus       string    `yaml:"device_status,omitempty"`
+	LastCheckin        string    `yaml:"last_checkin,omitempty"`
 }
 
 // SpawnFunc launches a helper in the given session with extra CLI args.
@@ -168,9 +170,14 @@ func WithOnInstalled(fn func(binaryPath string)) Option {
 
 // Manager handles helper binary lifecycle: install/update plus per-session runtime state.
 type Manager struct {
-	mu         sync.Mutex
-	binaryPath string
-	baseDir    string
+	branding              *Branding
+	brandingLoaded        bool
+	brandingBlocked       bool
+	brandingGeneration    string
+	brandingGenerationErr error
+	mu                    sync.Mutex
+	binaryPath            string
+	baseDir               string
 	// serverURL resolves the control-plane base URL. It is a provider
 	// (func() string) rather than a plain string so the verified downloader
 	// re-resolves it at call time and follows the heartbeat's backup-server-URL
@@ -284,6 +291,7 @@ func New(ctx context.Context, serverURL func() string, authToken *secmem.SecureS
 	if m.downloadFunc == nil {
 		m.downloadFunc = defaultHelperDownloader(m.serverURL, m.backupServerURL, m.authToken, m.agentVersion, m.manifestKeys, m.requireManifestSigningKeyID)
 	}
+	m.brandingGeneration, m.brandingGenerationErr = readBrandingGeneration(m.baseDir)
 	return m
 }
 
@@ -369,6 +377,17 @@ func (m *Manager) Apply(settings *Settings) {
 		return
 	}
 
+	// Runs before unlocking, after every config write and restart decision.
+	defer m.finishBrandingLifecycleLocked()
+
+	if err := m.applyBrandingLocked(settings.Branding); err != nil {
+		m.stopForBrandingFailureLocked()
+		log.Error("failed to persist helper branding; helper stopped until identity is safe", "error", err.Error())
+		return // Do not launch with stale identity after a scope change.
+	}
+
+	m.brandingBlocked = false
+
 	// Snapshot install state BEFORE migrateFromLegacyName — on Linux (and
 	// old-name darwin/windows) it can delete the binary, and we must still
 	// finish uninstall cleanup exactly once for a legacy box upgrading with
@@ -452,6 +471,7 @@ func (m *Manager) Apply(settings *Settings) {
 	activeSessions := m.sessionEnumerator.ActiveSessions()
 	activeKeys := make(map[string]bool, len(activeSessions))
 	cfg := settingsToConfig(settings)
+	cfg.Branding = m.branding
 
 	for _, si := range activeSessions {
 		activeKeys[si.Key] = true
@@ -682,6 +702,12 @@ func (m *Manager) writeSessionConfig(state *sessionState, cfg *Config, si Sessio
 var minConfigFlagVersion = [3]int{0, 14, 0}
 
 func (m *Manager) ensureRunningSession(state *sessionState) error {
+	if m.brandingBlocked {
+		return fmt.Errorf("helper branding is unsafe; waiting for valid settings")
+	}
+	if err := m.checkBrandingGeneration(); err != nil {
+		return err
+	}
 	// First check: scan the process table for breeze-helper.exe in this
 	// session. This is the reliable check that the old code used (by process
 	// name) — immune to PID tracking failures from cmd.exe wrappers, Tauri
@@ -983,6 +1009,7 @@ func (m *Manager) installedVersionLocked() string {
 // applyPendingUpdate checks if a Helper update is pending and all sessions are idle.
 // Must be called with m.mu held.
 func (m *Manager) applyPendingUpdate() {
+	defer m.finishBrandingLifecycleLocked()
 	if m.pendingHelperVersion == "" {
 		return
 	}

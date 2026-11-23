@@ -1,4 +1,6 @@
+mod branding;
 mod ipc;
+mod locale;
 mod single_instance;
 mod workspace_open;
 
@@ -29,6 +31,8 @@ pub struct AgentConfig {
     pub has_mtls: bool,
     pub os_username: String,
     pub helper_version: String,
+    pub locale: String,
+    pub branding: Option<branding::Branding>,
 }
 
 /// Internal struct that also holds the raw PEM material (never sent to frontend).
@@ -159,7 +163,7 @@ fn load_agent_config_full() -> Result<AgentConfigFull, String> {
 
     let contents = std::fs::read_to_string(&path).map_err(|e| {
         log_helper_error(&format!("agent config not found at {}: {}", path.display(), e));
-        "Breeze Assist requires the Breeze agent. Ensure the Breeze agent is installed and running on this device.".to_string()
+        locale::text("Breeze Assist requires the Breeze agent. Ensure the Breeze agent is installed and running on this device.", "O Breeze Assist requer o agente Breeze. Verifique se ele está instalado e em execução neste dispositivo.").to_string()
     })?;
 
     let yaml: serde_yaml::Value = serde_yaml::from_str(&contents).map_err(|e| {
@@ -168,8 +172,7 @@ fn load_agent_config_full() -> Result<AgentConfigFull, String> {
             path.display(),
             e
         ));
-        "Agent configuration is corrupt. Reinstall the Breeze agent or contact your administrator."
-            .to_string()
+        locale::text("Agent configuration is corrupt. Reinstall the Breeze agent or contact your administrator.", "A configuração do agente está corrompida. Reinstale o agente Breeze ou contate seu administrador.").to_string()
     })?;
 
     // secrets.yaml holds the mTLS material. It is readable only by
@@ -196,7 +199,7 @@ fn agent_config_from_yaml(
         .and_then(|v| v.as_str())
         .ok_or_else(|| {
             log_helper_error("missing required field 'server_url' in agent config");
-            "Agent configuration is incomplete. The agent may still be enrolling \u{2014} wait a moment and retry.".to_string()
+            locale::text("Agent configuration is incomplete. The agent may still be enrolling \u{2014} wait a moment and retry.", "A configuração do agente está incompleta. O cadastro pode estar em andamento — aguarde um momento e tente novamente.").to_string()
         })?
         .to_string();
 
@@ -207,7 +210,7 @@ fn agent_config_from_yaml(
         .and_then(|v| v.as_str())
         .ok_or_else(|| {
             log_helper_error("missing required field 'agent_id' in agent config");
-            "Agent configuration is incomplete. The agent may still be enrolling \u{2014} wait a moment and retry.".to_string()
+            locale::text("Agent configuration is incomplete. The agent may still be enrolling \u{2014} wait a moment and retry.", "A configuração do agente está incompleta. O cadastro pode estar em andamento — aguarde um momento e tente novamente.").to_string()
         })?
         .to_string();
 
@@ -249,7 +252,7 @@ fn select_bearer_token(
     ipc_token
         .filter(|t| !t.is_empty())
         .or_else(|| file_token.filter(|t| !t.is_empty()))
-        .ok_or_else(|| HELPER_TOKEN_UNAVAILABLE.to_string())
+        .ok_or_else(|| locale::text(HELPER_TOKEN_UNAVAILABLE, "O Breeze Assist ainda não recebeu suas credenciais do agente Breeze. Verifique se o agente está em execução e tente novamente. Se o problema persistir, contate seu administrador.").to_string())
 }
 
 // ---------------------------------------------------------------------------
@@ -350,7 +353,8 @@ fn resolve_helper_config_path() -> PathBuf {
     #[cfg(test)]
     if let Ok(guard) = TEST_ARGS_OVERRIDE.lock() {
         if let Some(ref args) = *guard {
-            return config_path_from_args(args.clone().into_iter()).unwrap_or_else(helper_config_path);
+            return config_path_from_args(args.clone().into_iter())
+                .unwrap_or_else(helper_config_path);
         }
     }
     config_path_from_args(std::env::args().skip(1)).unwrap_or_else(helper_config_path)
@@ -396,7 +400,11 @@ fn load_agent_server_url() -> Result<String, String> {
             path.display(),
             e
         ));
-        "Breeze agent configuration is unavailable.".to_string()
+        locale::text(
+            "Breeze agent configuration is unavailable.",
+            "A configuração do agente Breeze não está disponível.",
+        )
+        .to_string()
     })?;
     let yaml: serde_yaml::Value = serde_yaml::from_str(&contents).map_err(|e| {
         log_helper_error(&format!(
@@ -404,7 +412,11 @@ fn load_agent_server_url() -> Result<String, String> {
             path.display(),
             e
         ));
-        "Agent configuration is corrupt.".to_string()
+        locale::text(
+            "Agent configuration is corrupt.",
+            "A configuração do agente está corrompida.",
+        )
+        .to_string()
     })?;
     yaml.get("server_url")
         .and_then(|v| v.as_str())
@@ -412,7 +424,11 @@ fn load_agent_server_url() -> Result<String, String> {
         .filter(|s| !s.is_empty())
         .ok_or_else(|| {
             log_helper_error("missing required field 'server_url' in agent config");
-            "Agent configuration is incomplete.".to_string()
+            locale::text(
+                "Agent configuration is incomplete.",
+                "A configuração do agente está incompleta.",
+            )
+            .to_string()
         })
 }
 
@@ -560,10 +576,16 @@ fn build_client(cfg: &AgentConfigFull) -> Result<Client, String> {
         (Some(cert_pem), Some(key_pem)) => {
             // reqwest Identity expects PEM with both cert and key concatenated.
             let combined_pem = format!("{}\n{}", cert_pem, key_pem);
-            Some(
-                Identity::from_pem(combined_pem.as_bytes())
-                    .map_err(|e| format!("Failed to build mTLS identity: {}", e))?,
-            )
+            Some(Identity::from_pem(combined_pem.as_bytes()).map_err(|e| {
+                format!(
+                    "{}: {}",
+                    locale::text(
+                        "Failed to build mTLS identity",
+                        "Não foi possível criar a identidade mTLS"
+                    ),
+                    e
+                )
+            })?)
         }
         _ => None,
     };
@@ -586,9 +608,16 @@ fn build_client(cfg: &AgentConfigFull) -> Result<Client, String> {
                  falling back to bundled public roots only",
                 native_err
             ));
-            builder(false)
-                .build()
-                .map_err(|e| format!("Failed to build HTTP client: {}", e))
+            builder(false).build().map_err(|e| {
+                format!(
+                    "{}: {}",
+                    locale::text(
+                        "Failed to build HTTP client",
+                        "Não foi possível criar o cliente HTTP"
+                    ),
+                    e
+                )
+            })
         }
     }
 }
@@ -615,18 +644,22 @@ fn transport_error_message(err: &(dyn std::error::Error + 'static)) -> String {
         // We rejected the server's certificate (UnknownIssuer, expired, name
         // mismatch, ...).
         if msg.contains("invalid peer certificate") {
-            return CERTIFICATE_CONNECT_ERROR.to_string();
+            return locale::text(CERTIFICATE_CONNECT_ERROR, "Não foi possível conectar ao servidor Breeze: o certificado TLS não é confiável neste computador. Instale a autoridade certificadora no repositório de certificados raiz confiáveis do sistema operacional.").to_string();
         }
         // The server rejected ours (mTLS): BadCertificate, CertificateRequired,
         // CertificateExpired/Revoked, UnknownCA, ...
         if msg.contains("received fatal alert")
             && (msg.contains("certificate") || msg.contains("unknownca"))
         {
-            return CLIENT_CERTIFICATE_REJECTED_ERROR.to_string();
+            return locale::text(CLIENT_CERTIFICATE_REJECTED_ERROR, "Não foi possível conectar ao servidor Breeze: o servidor rejeitou o certificado TLS deste computador. Pode ser necessário cadastrar novamente o agente Breeze.").to_string();
         }
         current = e.source();
     }
-    GENERIC_CONNECT_ERROR.to_string()
+    locale::text(
+        GENERIC_CONNECT_ERROR,
+        "Não foi possível conectar ao servidor Breeze. Verifique sua conexão de rede.",
+    )
+    .to_string()
 }
 
 /// Ensure the HTTP state is initialized, returning a reference. Caller holds the mutex guard.
@@ -778,9 +811,13 @@ async fn read_agent_config() -> Result<AgentConfig, String> {
 
     let lock = get_http_state_lock();
     let guard = lock.lock().await;
-    let state = guard
-        .as_ref()
-        .ok_or_else(|| "HTTP state not initialized".to_string())?;
+    let state = guard.as_ref().ok_or_else(|| {
+        locale::text(
+            "HTTP state not initialized",
+            "O estado HTTP não foi inicializado",
+        )
+        .to_string()
+    })?;
 
     Ok(AgentConfig {
         api_url: state.config.api_url.clone(),
@@ -788,6 +825,8 @@ async fn read_agent_config() -> Result<AgentConfig, String> {
         has_mtls: state.config.mtls_cert_pem.is_some() && state.config.mtls_key_pem.is_some(),
         os_username: get_os_username(),
         helper_version: env!("CARGO_PKG_VERSION").to_string(),
+        locale: locale::current().to_string(),
+        branding: load_runtime_branding(),
     })
 }
 
@@ -812,8 +851,61 @@ fn get_os_username() -> String {
 }
 
 #[tauri::command]
-fn get_helper_config() -> HelperConfig {
-    load_helper_config()
+fn get_helper_config() -> serde_json::Value {
+    let mut config = serde_json::to_value(load_helper_config())
+        .expect("HelperConfig serialization is infallible");
+    config["locale"] = serde_json::json!(locale::current());
+    config
+}
+
+/// Read branding through the same per-session policy file as operational settings.
+fn load_runtime_branding() -> Option<branding::Branding> {
+    branding::read(&resolve_helper_config_path())
+}
+
+/// All refresh paths share one display fingerprint. Dynamic device status
+/// does not affect native labels, so heartbeat timestamps cannot churn menus.
+fn apply_runtime_display(app: &AppHandle, branding: &Option<branding::Branding>) -> bool {
+    static LAST_DISPLAY: OnceLock<std::sync::Mutex<Option<String>>> = OnceLock::new();
+    let config = load_helper_config();
+    let fingerprint = serde_json::to_string(&(
+        config.show_tray_icon,
+        config.show_open_portal,
+        config.show_device_info,
+        config.show_request_support,
+        locale::current(),
+        &branding,
+    ))
+    .unwrap_or_default();
+    let mut last = LAST_DISPLAY
+        .get_or_init(|| std::sync::Mutex::new(None))
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if last.as_ref() == Some(&fingerprint) {
+        return false;
+    }
+    let name = branding::display_name(branding.as_ref());
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.set_title(name);
+    }
+    if let Some(tray) = app.tray_by_id("main") {
+        apply_tray_visibility(&tray, config.show_tray_icon);
+        let _ = tray.set_tooltip(Some(&format!("{} v{}", name, env!("CARGO_PKG_VERSION"))));
+        if let Ok(menu) = build_tray_menu(app, &config, branding.as_ref()) {
+            let _ = tray.set_menu(Some(menu));
+        }
+    }
+    *last = Some(fingerprint);
+    true
+}
+
+#[tauri::command]
+async fn refresh_agent_config(app: AppHandle) -> Result<AgentConfig, String> {
+    let config = read_agent_config().await?;
+    if apply_runtime_display(&app, &config.branding) {
+        let _ = app.emit("agent-config-changed", &config);
+    }
+    Ok(config)
 }
 
 /// Restart the IPC client if it stopped (it gives up after a permanent broker
@@ -885,17 +977,38 @@ struct StreamChunkEvent {
 }
 
 fn request_url_allowed(api_url: &str, request_url: &str) -> Result<(), String> {
-    let base = reqwest::Url::parse(api_url)
-        .map_err(|e| format!("Configured API URL is invalid: {}", e))?;
-    let requested =
-        reqwest::Url::parse(request_url).map_err(|e| format!("Request URL is invalid: {}", e))?;
+    let base = reqwest::Url::parse(api_url).map_err(|e| {
+        format!(
+            "{}: {}",
+            locale::text(
+                "Configured API URL is invalid",
+                "A URL da API configurada é inválida"
+            ),
+            e
+        )
+    })?;
+    let requested = reqwest::Url::parse(request_url).map_err(|e| {
+        format!(
+            "{}: {}",
+            locale::text("Request URL is invalid", "A URL da solicitação é inválida"),
+            e
+        )
+    })?;
 
     if base.scheme() != "https" && base.scheme() != "http" {
-        return Err("Configured API URL must use http or https".to_string());
+        return Err(locale::text(
+            "Configured API URL must use http or https",
+            "A URL da API configurada deve usar http ou https",
+        )
+        .to_string());
     }
 
     if requested.username() != "" || requested.password().is_some() {
-        return Err("Request URL must not contain credentials".to_string());
+        return Err(locale::text(
+            "Request URL must not contain credentials",
+            "A URL da solicitação não pode conter credenciais",
+        )
+        .to_string());
     }
 
     let same_origin = base.scheme() == requested.scheme()
@@ -903,7 +1016,11 @@ fn request_url_allowed(api_url: &str, request_url: &str) -> Result<(), String> {
         && base.port_or_known_default() == requested.port_or_known_default();
     if !same_origin {
         return Err(format!(
-            "Request URL must target the configured API origin ({})",
+            "{} ({})",
+            locale::text(
+                "Request URL must target the configured API origin",
+                "A URL da solicitação deve apontar para a origem da API configurada"
+            ),
             base.origin().ascii_serialization()
         ));
     }
@@ -912,7 +1029,11 @@ fn request_url_allowed(api_url: &str, request_url: &str) -> Result<(), String> {
     if base_path != "/" {
         let request_path = requested.path();
         if path_has_dot_segment(request_path) {
-            return Err("Request URL path must not contain dot segments".to_string());
+            return Err(locale::text(
+                "Request URL path must not contain dot segments",
+                "O caminho da URL da solicitação não pode conter segmentos de ponto",
+            )
+            .to_string());
         }
         let in_base_path = if base_path.ends_with('/') {
             request_path.starts_with(base_path)
@@ -921,7 +1042,8 @@ fn request_url_allowed(api_url: &str, request_url: &str) -> Result<(), String> {
         };
         if !in_base_path {
             return Err(format!(
-                "Request URL path must stay under the configured API base path ({})",
+                "{} ({})",
+                locale::text("Request URL path must stay under the configured API base path", "O caminho da URL da solicitação deve permanecer sob o caminho base da API configurada"),
                 base_path
             ));
         }
@@ -956,19 +1078,36 @@ fn same_https_origin(left: &reqwest::Url, right: &reqwest::Url) -> bool {
 }
 
 fn validate_portal_open_url(portal_url: &str, api_url: Option<&str>) -> Result<String, String> {
-    let requested =
-        reqwest::Url::parse(portal_url).map_err(|e| format!("Portal URL is invalid: {}", e))?;
+    let requested = reqwest::Url::parse(portal_url).map_err(|e| {
+        format!(
+            "{}: {}",
+            locale::text("Portal URL is invalid", "A URL do portal é inválida"),
+            e
+        )
+    })?;
 
     if requested.scheme() != "https" {
-        return Err("Portal URL must use https".to_string());
+        return Err(locale::text(
+            "Portal URL must use https",
+            "A URL do portal deve usar https",
+        )
+        .to_string());
     }
     if requested.username() != "" || requested.password().is_some() {
-        return Err("Portal URL must not contain credentials".to_string());
+        return Err(locale::text(
+            "Portal URL must not contain credentials",
+            "A URL do portal não pode conter credenciais",
+        )
+        .to_string());
     }
 
-    let host = requested
-        .host_str()
-        .ok_or_else(|| "Portal URL must include a host".to_string())?;
+    let host = requested.host_str().ok_or_else(|| {
+        locale::text(
+            "Portal URL must include a host",
+            "A URL do portal deve incluir um host",
+        )
+        .to_string()
+    })?;
 
     if host_is_breeze_portal(host) {
         return Ok(requested.to_string());
@@ -985,7 +1124,11 @@ fn validate_portal_open_url(portal_url: &str, api_url: Option<&str>) -> Result<S
         }
     }
 
-    Err("Portal URL must target an approved Breeze portal origin".to_string())
+    Err(locale::text(
+        "Portal URL must target an approved Breeze portal origin",
+        "A URL do portal deve apontar para uma origem de portal Breeze aprovada",
+    )
+    .to_string())
 }
 
 #[tauri::command]
@@ -1001,9 +1144,13 @@ async fn helper_fetch(
     let (client, file_token, api_url) = {
         let lock = get_http_state_lock();
         let mut guard = lock.lock().await;
-        let state = guard
-            .as_mut()
-            .ok_or_else(|| "HTTP state not initialized".to_string())?;
+        let state = guard.as_mut().ok_or_else(|| {
+            locale::text(
+                "HTTP state not initialized",
+                "O estado HTTP não foi inicializado",
+            )
+            .to_string()
+        })?;
         if ipc_token.as_deref().is_none_or(str::is_empty) {
             refresh_missing_file_token(&mut state.config, &agent_config_path());
         }
@@ -1018,10 +1165,23 @@ async fn helper_fetch(
     // This prevents SSRF and token leakage to arbitrary hosts.
     request_url_allowed(&api_url, &request.url)?;
 
-    let configured_url = reqwest::Url::parse(&api_url)
-        .map_err(|e| format!("Configured API URL is invalid: {}", e))?;
-    let requested_url =
-        reqwest::Url::parse(&request.url).map_err(|e| format!("Request URL is invalid: {}", e))?;
+    let configured_url = reqwest::Url::parse(&api_url).map_err(|e| {
+        format!(
+            "{}: {}",
+            locale::text(
+                "Configured API URL is invalid",
+                "A URL da API configurada é inválida"
+            ),
+            e
+        )
+    })?;
+    let requested_url = reqwest::Url::parse(&request.url).map_err(|e| {
+        format!(
+            "{}: {}",
+            locale::text("Request URL is invalid", "A URL da solicitação é inválida"),
+            e
+        )
+    })?;
     let configured_path = configured_url.path().trim_end_matches('/');
     let relative_path = requested_url
         .path()
@@ -1036,7 +1196,13 @@ async fn helper_fetch(
         .as_deref()
         .unwrap_or("GET")
         .parse()
-        .map_err(|e| format!("Invalid HTTP method: {}", e))?;
+        .map_err(|e| {
+            format!(
+                "{}: {}",
+                locale::text("Invalid HTTP method", "Método HTTP inválido"),
+                e
+            )
+        })?;
 
     // Apply caller-specified headers (excluding Authorization which is always set by us)
     let mut header_map = HeaderMap::new();
@@ -1046,12 +1212,25 @@ async fn helper_fetch(
             if k.eq_ignore_ascii_case("authorization") {
                 continue;
             }
-            let name = k
-                .parse::<reqwest::header::HeaderName>()
-                .map_err(|e| format!("Invalid header name '{}': {}", k, e))?;
-            let val = v
-                .parse::<reqwest::header::HeaderValue>()
-                .map_err(|e| format!("Invalid header value for '{}': {}", k, e))?;
+            let name = k.parse::<reqwest::header::HeaderName>().map_err(|e| {
+                format!(
+                    "{} '{}': {}",
+                    locale::text("Invalid header name", "Nome de cabeçalho inválido"),
+                    k,
+                    e
+                )
+            })?;
+            let val = v.parse::<reqwest::header::HeaderValue>().map_err(|e| {
+                format!(
+                    "{} '{}': {}",
+                    locale::text(
+                        "Invalid header value for",
+                        "Valor de cabeçalho inválido para"
+                    ),
+                    k,
+                    e
+                )
+            })?;
             header_map.insert(name, val);
         }
     }
@@ -1074,8 +1253,16 @@ async fn helper_fetch(
         let request_query = request_query.clone();
 
         async move {
-            let mut url = reqwest::Url::parse(&api_url)
-                .map_err(|e| SendError::Url(format!("Configured API URL is invalid: {}", e)))?;
+            let mut url = reqwest::Url::parse(&api_url).map_err(|e| {
+                SendError::Url(format!(
+                    "{}: {}",
+                    locale::text(
+                        "Configured API URL is invalid",
+                        "A URL da API configurada é inválida"
+                    ),
+                    e
+                ))
+            })?;
             let base_path = url.path().trim_end_matches('/');
             url.set_path(&format!("{}{}", base_path, relative_path));
             url.set_query(request_query.as_deref());
@@ -1113,9 +1300,13 @@ async fn helper_fetch(
             let (fresh_client, fresh_file_token, fresh_api_url) = {
                 let lock = get_http_state_lock();
                 let guard = lock.lock().await;
-                let state = guard
-                    .as_ref()
-                    .ok_or_else(|| "HTTP state not initialized".to_string())?;
+                let state = guard.as_ref().ok_or_else(|| {
+                    locale::text(
+                        "HTTP state not initialized",
+                        "O estado HTTP não foi inicializado",
+                    )
+                    .to_string()
+                })?;
                 (
                     state.client.clone(),
                     state.config.file_token.clone(),
@@ -1192,7 +1383,11 @@ async fn helper_fetch(
                             stream_id: sid.clone(),
                             chunk: None,
                             done: true,
-                            error: Some(format!("Stream read error: {}", e)),
+                            error: Some(format!(
+                                "{}: {}",
+                                locale::text("Stream read error", "Erro ao ler o fluxo de dados"),
+                                e
+                            )),
                         };
                         if let Err(e) = app_clone.emit("helper-fetch-stream", &event) {
                             eprintln!("[helper] Failed to emit stream error event: {}", e);
@@ -1222,10 +1417,16 @@ async fn helper_fetch(
         })
     } else {
         // Non-stream mode: read full body
-        let body = response
-            .text()
-            .await
-            .map_err(|e| format!("Failed to read response body: {}", e))?;
+        let body = response.text().await.map_err(|e| {
+            format!(
+                "{}: {}",
+                locale::text(
+                    "Failed to read response body",
+                    "Não foi possível ler o corpo da resposta"
+                ),
+                e
+            )
+        })?;
 
         Ok(HelperFetchResponse {
             status,
@@ -1290,27 +1491,44 @@ fn apply_tray_visibility<R: tauri::Runtime>(tray: &tauri::tray::TrayIcon<R>, vis
 fn build_tray_menu(
     app: &AppHandle,
     config: &HelperConfig,
+    branding: Option<&branding::Branding>,
 ) -> Result<tauri::menu::Menu<tauri::Wry>, tauri::Error> {
     let mut builder = MenuBuilder::new(app);
 
     if config.show_request_support {
-        let item = MenuItemBuilder::with_id("request_support", "Request Support").build(app)?;
+        let item = MenuItemBuilder::with_id(
+            "request_support",
+            branding
+                .and_then(|b| b.values.support_label.as_deref())
+                .unwrap_or(locale::text("Request Support", "Solicitar suporte")),
+        )
+        .build(app)?;
         builder = builder.item(&item);
     }
 
     if config.show_open_portal {
-        let item = MenuItemBuilder::with_id("open_portal", "Open Breeze Portal").build(app)?;
+        let item = MenuItemBuilder::with_id(
+            "open_portal",
+            branding
+                .and_then(|b| b.values.portal_label.as_deref())
+                .unwrap_or(locale::text("Open Breeze Portal", "Abrir portal Breeze")),
+        )
+        .build(app)?;
         builder = builder.item(&item);
     }
 
     if config.show_device_info {
-        let item = MenuItemBuilder::with_id("device_info", "Device Info").build(app)?;
+        let item = MenuItemBuilder::with_id(
+            "device_info",
+            locale::text("Device Info", "Informações do dispositivo"),
+        )
+        .build(app)?;
         builder = builder.item(&item);
     }
 
     builder = builder.separator();
 
-    let exit_item = MenuItemBuilder::with_id("exit", "Exit").build(app)?;
+    let exit_item = MenuItemBuilder::with_id("exit", locale::text("Exit", "Sair")).build(app)?;
     builder = builder.item(&exit_item);
 
     builder.build()
@@ -1338,6 +1556,7 @@ pub fn run() {
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .invoke_handler(tauri::generate_handler![
             read_agent_config,
+            refresh_agent_config,
             helper_fetch,
             hide_window,
             minimize_window,
@@ -1364,7 +1583,7 @@ pub fn run() {
                 "main",
                 tauri::WebviewUrl::App("index.html".into()),
             )
-            .title("Breeze Helper")
+            .title(branding::display_name(load_runtime_branding().as_ref()))
             .inner_size(920.0, 640.0)
             .min_inner_size(360.0, 520.0)
             .resizable(true)
@@ -1440,7 +1659,7 @@ pub fn run() {
                 )));
 
                 // Build and set the context menu (shown on right-click)
-                match build_tray_menu(&handle, &config) {
+                match build_tray_menu(&handle, &config, load_runtime_branding().as_ref()) {
                     Ok(menu) => {
                         if let Err(e) = tray.set_menu(Some(menu)) {
                             eprintln!("[helper] Failed to set tray menu: {}", e);
@@ -1464,6 +1683,8 @@ pub fn run() {
                     }
                 });
             }
+
+            apply_runtime_display(&handle, &load_runtime_branding());
 
             // Write initial status file (not chatting)
             write_status_file(false);
@@ -1511,26 +1732,12 @@ pub fn run() {
             // Periodic config reload — rebuild tray menu every 60s on config change
             let reload_handle = handle.clone();
             tauri::async_runtime::spawn(async move {
-                let mut last_config =
-                    serde_yaml::to_string(&load_helper_config()).unwrap_or_default();
                 loop {
                     tokio::time::sleep(std::time::Duration::from_secs(60)).await;
-                    let new_config = load_helper_config();
-                    let new_yaml = serde_yaml::to_string(&new_config).unwrap_or_default();
-                    if new_yaml != last_config {
-                        eprintln!("[helper] Config changed, rebuilding tray menu");
-                        if let Some(tray) = reload_handle.tray_by_id("main") {
-                            apply_tray_visibility(&tray, new_config.show_tray_icon);
-                            match build_tray_menu(&reload_handle, &new_config) {
-                                Ok(menu) => {
-                                    if let Err(e) = tray.set_menu(Some(menu)) {
-                                        eprintln!("[helper] Failed to update tray menu: {}", e);
-                                    }
-                                }
-                                Err(e) => eprintln!("[helper] Failed to rebuild tray menu: {}", e),
-                            }
+                    if apply_runtime_display(&reload_handle, &load_runtime_branding()) {
+                        if let Ok(config) = read_agent_config().await {
+                            let _ = reload_handle.emit("agent-config-changed", &config);
                         }
-                        last_config = new_yaml;
                     }
 
                     // Refresh status file timestamp (shows helper is alive even when idle)
@@ -1765,9 +1972,7 @@ mod tests {
         let args = vec!["--config=/etc/breeze/sessions/s-2/helper_config.yaml"];
         assert_eq!(
             config_path_from_args(args.into_iter()),
-            Some(PathBuf::from(
-                "/etc/breeze/sessions/s-2/helper_config.yaml"
-            ))
+            Some(PathBuf::from("/etc/breeze/sessions/s-2/helper_config.yaml"))
         );
     }
 
@@ -1828,7 +2033,10 @@ mod tests {
     #[test]
     fn helper_status_path_under_config_arg_derives_from_session_config() {
         with_test_args(
-            vec!["--config", "/var/lib/breeze/sessions/s-1/helper_config.yaml"],
+            vec![
+                "--config",
+                "/var/lib/breeze/sessions/s-1/helper_config.yaml",
+            ],
             || {
                 assert_eq!(
                     helper_status_path(),
@@ -1916,7 +2124,8 @@ agent_id: agent-1
         )
         .expect("parse yaml");
 
-        let cfg = agent_config_from_yaml(&yaml, None, None).expect("config without a file token loads");
+        let cfg =
+            agent_config_from_yaml(&yaml, None, None).expect("config without a file token loads");
         assert_eq!(cfg.api_url, "https://api.example.test");
         assert_eq!(cfg.agent_id, "agent-1");
         assert_eq!(cfg.file_token, None);
@@ -1957,14 +2166,20 @@ helper_auth_token: brz_helper_agent_yaml
     // LoadHelperConfig; an empty value there falls back to agent.yaml.
     #[test]
     fn agent_config_reads_helper_token_file() {
-        let yaml = |doc: &str| -> serde_yaml::Value { serde_yaml::from_str(doc).expect("parse yaml") };
+        let yaml =
+            |doc: &str| -> serde_yaml::Value { serde_yaml::from_str(doc).expect("parse yaml") };
         let base = "server_url: https://api.example.test\nagent_id: agent-1\n";
         let with_agent_yaml_token = format!("{base}helper_auth_token: brz_helper_agent_yaml\n");
         let helper_file = yaml("helper_auth_token: brz_helper_file\n");
         let empty_helper_file = yaml("helper_auth_token: \"\"\n");
 
         let cases: [(&str, String, Option<&serde_yaml::Value>, Option<&str>); 4] = [
-            ("helper file only", base.to_string(), Some(&helper_file), Some("brz_helper_file")),
+            (
+                "helper file only",
+                base.to_string(),
+                Some(&helper_file),
+                Some("brz_helper_file"),
+            ),
             (
                 "helper file wins over agent.yaml",
                 with_agent_yaml_token.clone(),
@@ -1977,7 +2192,12 @@ helper_auth_token: brz_helper_agent_yaml
                 Some(&empty_helper_file),
                 Some("brz_helper_agent_yaml"),
             ),
-            ("empty helper file and no agent.yaml token", base.to_string(), Some(&empty_helper_file), None),
+            (
+                "empty helper file and no agent.yaml token",
+                base.to_string(),
+                Some(&empty_helper_file),
+                None,
+            ),
         ];
         for (name, agent_yaml, helper_token_file, want) in cases {
             let cfg = agent_config_from_yaml(&yaml(&agent_yaml), None, helper_token_file)
@@ -1987,9 +2207,17 @@ helper_auth_token: brz_helper_agent_yaml
 
         // An elevated Helper that can read secrets.yaml uses the agent's own copy.
         let secrets = yaml("helper_auth_token: brz_helper_secret\n");
-        let cfg = agent_config_from_yaml(&yaml(&with_agent_yaml_token), Some(&secrets), Some(&helper_file))
-            .expect("config loads");
-        assert_eq!(cfg.file_token.as_deref(), Some("brz_helper_secret"), "secrets.yaml wins");
+        let cfg = agent_config_from_yaml(
+            &yaml(&with_agent_yaml_token),
+            Some(&secrets),
+            Some(&helper_file),
+        )
+        .expect("config loads");
+        assert_eq!(
+            cfg.file_token.as_deref(),
+            Some("brz_helper_secret"),
+            "secrets.yaml wins"
+        );
     }
 
     /// A fresh directory for tests that read the agent's config files from disk.
@@ -2010,9 +2238,16 @@ helper_auth_token: brz_helper_agent_yaml
         let agent_yaml = dir.join("agent.yaml");
         let helper_file = dir.join("helper_token.yaml");
 
-        std::fs::write(&agent_yaml, "server_url: https://api.example.test\nagent_id: agent-1\n")
-            .unwrap();
-        assert_eq!(read_file_helper_token(&agent_yaml), None, "no token anywhere");
+        std::fs::write(
+            &agent_yaml,
+            "server_url: https://api.example.test\nagent_id: agent-1\n",
+        )
+        .unwrap();
+        assert_eq!(
+            read_file_helper_token(&agent_yaml),
+            None,
+            "no token anywhere"
+        );
 
         std::fs::write(&helper_file, "helper_auth_token: brz_helper_file\n").unwrap();
         assert_eq!(
@@ -2028,7 +2263,11 @@ helper_auth_token: brz_helper_agent_yaml
             use std::os::unix::fs::PermissionsExt;
             std::fs::set_permissions(&helper_file, std::fs::Permissions::from_mode(0o000)).unwrap();
             if std::fs::read(&helper_file).is_err() {
-                assert_eq!(read_file_helper_token(&agent_yaml), None, "unreadable helper file");
+                assert_eq!(
+                    read_file_helper_token(&agent_yaml),
+                    None,
+                    "unreadable helper file"
+                );
             }
             std::fs::set_permissions(&helper_file, std::fs::Permissions::from_mode(0o600)).unwrap();
         }
@@ -2048,7 +2287,10 @@ helper_auth_token: brz_helper_agent_yaml
         // The group-readable file alone is enough, even if agent.yaml is gone.
         std::fs::remove_file(&agent_yaml).unwrap();
         std::fs::write(&helper_file, "helper_auth_token: brz_helper_file\n").unwrap();
-        assert_eq!(read_file_helper_token(&agent_yaml).as_deref(), Some("brz_helper_file"));
+        assert_eq!(
+            read_file_helper_token(&agent_yaml).as_deref(),
+            Some("brz_helper_file")
+        );
 
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -2061,8 +2303,11 @@ helper_auth_token: brz_helper_agent_yaml
     fn refresh_missing_file_token_rereads_only_when_none_was_found() {
         let dir = test_config_dir("refresh-missing-file-token");
         let agent_yaml = dir.join("agent.yaml");
-        std::fs::write(&agent_yaml, "server_url: https://api.example.test\nagent_id: agent-1\n")
-            .unwrap();
+        std::fs::write(
+            &agent_yaml,
+            "server_url: https://api.example.test\nagent_id: agent-1\n",
+        )
+        .unwrap();
         let yaml: serde_yaml::Value =
             serde_yaml::from_str(&std::fs::read_to_string(&agent_yaml).unwrap()).unwrap();
         let mut cfg = agent_config_from_yaml(&yaml, None, None).expect("config loads");
@@ -2071,13 +2316,29 @@ helper_auth_token: brz_helper_agent_yaml
         refresh_missing_file_token(&mut cfg, &agent_yaml);
         assert_eq!(cfg.file_token, None, "still nothing on disk");
 
-        std::fs::write(dir.join("helper_token.yaml"), "helper_auth_token: brz_late\n").unwrap();
+        std::fs::write(
+            dir.join("helper_token.yaml"),
+            "helper_auth_token: brz_late\n",
+        )
+        .unwrap();
         refresh_missing_file_token(&mut cfg, &agent_yaml);
-        assert_eq!(cfg.file_token.as_deref(), Some("brz_late"), "late token picked up");
+        assert_eq!(
+            cfg.file_token.as_deref(),
+            Some("brz_late"),
+            "late token picked up"
+        );
 
-        std::fs::write(dir.join("helper_token.yaml"), "helper_auth_token: brz_newer\n").unwrap();
+        std::fs::write(
+            dir.join("helper_token.yaml"),
+            "helper_auth_token: brz_newer\n",
+        )
+        .unwrap();
         refresh_missing_file_token(&mut cfg, &agent_yaml);
-        assert_eq!(cfg.file_token.as_deref(), Some("brz_late"), "a found token is kept");
+        assert_eq!(
+            cfg.file_token.as_deref(),
+            Some("brz_late"),
+            "a found token is kept"
+        );
 
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -2101,12 +2362,7 @@ helper_auth_token: brz_helper_agent_yaml
         let cases: [(&str, Option<String>, Option<String>, Option<&str>); 6] = [
             ("ipc wins over file", ipc(), file(), Some("brz_ipc")),
             ("ipc only", ipc(), None, Some("brz_ipc")),
-            (
-                "on-disk fallback",
-                None,
-                file(),
-                Some("brz_file"),
-            ),
+            ("on-disk fallback", None, file(), Some("brz_file")),
             ("neither", None, None, None),
             (
                 "empty ipc falls back",

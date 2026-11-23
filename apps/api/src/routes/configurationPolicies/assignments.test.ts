@@ -565,4 +565,22 @@ describe('configurationPolicies assignment routes', () => {
     expect(res.status).toBe(404);
     expect(unassignPolicyMock).not.toHaveBeenCalled();
   });
+  it.each(['site', 'device_group', 'device'])('rejects Helper branding on a %s assignment before writing', async level => {
+    getConfigPolicyMock.mockResolvedValue({ id: POLICY_ID, orgId: ORG_ID, partnerId: null, name: 'Brand',
+      featureLinks: [{ featureType: 'helper', inlineSettings: { branding: { displayName: 'MSP Assist' } } }] });
+    validateAssignmentTargetMock.mockResolvedValue({ valid: true });
+    const response = await app.request(`/${POLICY_ID}/assignments`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ level, targetId: DEVICE_ID }) });
+    expect(response.status).toBe(400);
+    expect(assignPolicyMock).not.toHaveBeenCalled();
+  });
+  it('does not reveal branding when the assignment target belongs to another tenant', async () => {
+    getConfigPolicyMock.mockResolvedValue({ id: POLICY_ID, orgId: ORG_ID, partnerId: null, name: 'Brand',
+      featureLinks: [{ featureType: 'helper', inlineSettings: { branding: { displayName: 'MSP Assist' } } }] });
+    validateAssignmentTargetMock.mockResolvedValue({ valid: false, error: 'Access denied' });
+    const response = await app.request(`/${POLICY_ID}/assignments`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ level: 'device', targetId: DEVICE_ID }) });
+    expect(response.status).toBe(403);
+    expect(assignPolicyMock).not.toHaveBeenCalled();
+  });
 });

@@ -67,6 +67,7 @@ function mockTx(existing: Record<string, unknown>) {
     update: vi.fn(() => chain([existing])),
     delete: vi.fn(() => chain([existing])),
     insert: vi.fn(() => chain([existing])),
+    execute: vi.fn().mockResolvedValue([]),
   };
   vi.mocked(db.transaction).mockImplementation(async (fn: any) => fn(tx));
   return tx;
@@ -154,7 +155,7 @@ describe('config writes that can make a compliance rule stop applying schedule a
   });
 
   it('assigning and unassigning the policy', async () => {
-    vi.mocked(db.insert).mockReturnValue(chain([{ id: 'a-1' }]) as never);
+    mockTx({ parentPolicyId: null }).insert.mockReturnValue(chain([{ id: 'a-1' }]));
     await assignPolicy(POLICY_ID, 'organization', 'org-1', 0, 'user-1');
     expect(scheduleMock).toHaveBeenLastCalledWith({ configPolicyId: POLICY_ID }, 'assignment-add');
 
@@ -164,7 +165,7 @@ describe('config writes that can make a compliance rule stop applying schedule a
   });
 
   it('but not an assignment that already existed', async () => {
-    vi.mocked(db.insert).mockReturnValue(chain([]) as never);
+    mockTx({ parentPolicyId: null }).insert.mockReturnValue(chain([]));
     await assignPolicy(POLICY_ID, 'organization', 'org-1', 0, 'user-1');
     expect(scheduleMock).not.toHaveBeenCalled();
   });

@@ -55,6 +55,7 @@ import SoftwarePolicyTab from './featureTabs/SoftwarePolicyTab';
 import SensitiveDataTab from './featureTabs/SensitiveDataTab';
 import PeripheralControlTab from './featureTabs/PeripheralControlTab';
 import WarrantyTab from './featureTabs/WarrantyTab';
+import type { HelperBrandingPreview } from "./featureTabs/HelperBrandingFields";
 import HelperTab from './featureTabs/HelperTab';
 import RemoteAccessTab from './featureTabs/RemoteAccessTab';
 import PamTab from './featureTabs/PamTab';
@@ -68,6 +69,7 @@ import { usePageItemName } from '../layout/usePageItemName';
 
 type Tab = 'overview' | FeatureType | 'assignments' | 'compliance_status';
 type PolicyDetail = {
+  helperBrandingPreview?: HelperBrandingPreview;
   id: string;
   name: string;
   description?: string;
@@ -291,6 +293,24 @@ export default function ConfigPolicyDetailPage({
   useEffect(() => {
     fetchPolicy();
   }, [fetchPolicy]);
+  // Assignments can change on the adjacent tab. Refresh server-resolved branding
+  // metadata whenever Helper opens; never reconstruct inheritance in the browser.
+  useEffect(() => {
+    if (activeTab !== 'helper' || !policyId) return;
+    let cancelled = false;
+    void fetchWithAuth(`/configuration-policies/${policyId}`).then(async response => {
+      if (!response.ok) throw new Error('Helper inheritance unavailable');
+      const data = await response.json();
+      if (!cancelled) setPolicy(previous => previous
+        ? { ...previous, helperBrandingPreview: data.helperBrandingPreview }
+        : previous);
+    }).catch(() => {
+      if (!cancelled) setPolicy(previous => previous
+        ? { ...previous, helperBrandingPreview: undefined }
+        : previous);
+    });
+    return () => { cancelled = true; };
+  }, [activeTab, policyId]);
   // Fetch feature links eagerly on mount
   useEffect(() => {
     fetchFeatureLinks();
@@ -456,6 +476,7 @@ export default function ConfigPolicyDetailPage({
       parentLink: parentLinkFor(ft),
       siblingLinks: featureLinks,
       orgId: policy?.orgId ?? null,
+      helperBrandingPreview: policy.helperBrandingPreview,
     };
     switch (ft) {
       case 'patch': return <PatchTab {...props} />;

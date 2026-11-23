@@ -41,6 +41,7 @@ vi.mock('../../stores/workspaceStore', () => {
 });
 
 import AppShell from './AppShell';
+import { setHelperLocale } from '../../lib/i18n';
 import { useChatStore } from '../../stores/chatStore';
 import { useWorkspaceStore } from '../../stores/workspaceStore';
 
@@ -120,6 +121,7 @@ function setWidth(px: number) {
 }
 
 beforeEach(() => {
+  setHelperLocale('en');
   vi.clearAllMocks();
   setChatState();
   setWorkspaceState();
@@ -128,6 +130,7 @@ beforeEach(() => {
 // jsdom's default innerWidth (1024) is "wide"; restore it so width tweaks in one
 // test don't leak into the next.
 afterEach(() => {
+  setHelperLocale('en');
   setWidth(1024);
 });
 
@@ -352,4 +355,18 @@ it('routes to the chat view when a past conversation is selected from History', 
 
   expect(screen.getByTestId('chat-view')).toBeInTheDocument();
   expect(screen.queryByTestId('workspace-panel')).not.toBeInTheDocument();
+});
+
+
+it.each([['high', 'alto'], ['critical', 'crítico']])('preserves %s severity styling while translating Portuguese approval labels', (riskTier, label) => {
+  setHelperLocale('pt-BR');
+  setChatState({ pendingApproval: {
+    executionId: 'risk-check', description: 'Operator description', input: {},
+    scriptProposal: { riskTier, summary: 'Operator summary', goal: 'Operator goal', findings: [], strictHits: [] },
+  } });
+  render(<AppShell />);
+  const risk = screen.getByTestId('helper-proposal-risk');
+  expect(risk).toHaveAttribute('data-tier', riskTier);
+  expect(risk).toHaveTextContent(label);
+  expect(screen.getByTestId('helper-proposal-summary')).toHaveTextContent('Operator summary');
 });

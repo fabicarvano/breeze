@@ -1,3 +1,4 @@
+import { useI18n } from '../../lib/i18n';
 import type { ReactNode } from 'react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
@@ -30,6 +31,7 @@ function stopEscapePropagation(e: React.KeyboardEvent) {
 }
 
 export function RowMenu({ items, children }: { items: MenuItem[]; children: ReactNode }) {
+  const t = useI18n();
   return (
     <ContextMenu.Root>
       <ContextMenu.Trigger asChild>
@@ -37,7 +39,7 @@ export function RowMenu({ items, children }: { items: MenuItem[]; children: Reac
           {children}
           <DropdownMenu.Root>
             <DropdownMenu.Trigger asChild>
-              <button type="button" className="ws-row-menu-overflow" aria-label="More actions">
+              <button type="button" className="ws-row-menu-overflow" aria-label={t("More actions")}>
                 &#8943;
               </button>
             </DropdownMenu.Trigger>

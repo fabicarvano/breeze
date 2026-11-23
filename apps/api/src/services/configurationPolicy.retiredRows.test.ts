@@ -51,7 +51,7 @@ it.each(['automation'])('uses live normalized %s rows over the mirror', async (f
 
 it.each(['alert_rule', 'automation', 'monitoring'])('removing %s preserves its retired source history', async (featureType) => {
   const link = { id: 'link', configPolicyId: 'policy', featureType, inlineSettings: { items: [{ name: 'Live' }] } };
-  m.rows = [[link], [], ...(featureType === 'alert_rule' ? [] : featureType === 'automation' ? [[]] : [[], []]), [{ id: 'retired-source' }]];
+  m.rows = [[link], [link], [], ...(featureType === 'alert_rule' ? [] : featureType === 'automation' ? [[]] : [[], []]), [{ id: 'retired-source' }]];
   const result = await removeFeatureLink('link', 'policy');
   expect(result).toMatchObject({ id: 'link', kept: true, reason: 'retired_history' });
   expect(m.deleted.some((d) => d.table === configPolicyFeatureLinks || d.table === configPolicyMonitoringSettings)).toBe(false);
@@ -66,7 +66,7 @@ it.each(['alert_rule', 'automation', 'monitoring'])('removing %s preserves its r
   }
 });
 it('removing a link without retired history still deletes the link', async () => {
-  m.rows = [[{ id: 'link', featureType: 'alert_rule' }], [], [], [], []];
+  m.rows = [[{ id: 'link', featureType: 'alert_rule' }], [{ id: 'link', featureType: 'alert_rule' }], [], [], [], []];
   expect(await removeFeatureLink('link', 'policy')).toMatchObject({ id: 'link' });
   expect(m.deleted.some((d) => d.table === configPolicyFeatureLinks)).toBe(true);
 });

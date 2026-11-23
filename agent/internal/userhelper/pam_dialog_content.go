@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/breeze-rmm/agent/internal/i18n"
 	"github.com/breeze-rmm/agent/internal/ipc"
 )
 
@@ -21,9 +22,9 @@ type pamDialogField struct {
 func pamDialogHeadline(req ipc.PamRequestDialog) string {
 	base := pamDialogExeBase(req.ExePath)
 	if base == "" {
-		return "An application is requesting elevation"
+		return i18n.Text("An application is requesting elevation")
 	}
-	return fmt.Sprintf("%s is requesting elevation", base)
+	return i18n.Format("%s is requesting elevation", base)
 }
 
 func pamDialogExeBase(path string) string {
@@ -39,18 +40,18 @@ func pamDialogExeBase(path string) string {
 // capture recorded them.
 func pamDialogFields(req ipc.PamRequestDialog) []pamDialogField {
 	fields := []pamDialogField{
-		{Label: "Program", Value: pamDialogValue(req.ExePath)},
-		{Label: "Signer", Value: pamDialogValue(req.Signer)},
-		{Label: "User", Value: pamDialogValue(req.SubjectUser)},
+		{Label: i18n.Text("Program"), Value: pamDialogValue(req.ExePath)},
+		{Label: i18n.Text("Signer"), Value: pamDialogValue(req.Signer)},
+		{Label: i18n.Text("User"), Value: pamDialogValue(req.SubjectUser)},
 	}
 	if strings.TrimSpace(req.CommandLine) != "" {
-		fields = append(fields, pamDialogField{Label: "Command line", Value: pamDialogValue(req.CommandLine)})
+		fields = append(fields, pamDialogField{Label: i18n.Text("Command line"), Value: pamDialogValue(req.CommandLine)})
 	}
 	if req.Reason != "" {
-		fields = append(fields, pamDialogField{Label: "Reason", Value: pamDialogValue(req.Reason)})
+		fields = append(fields, pamDialogField{Label: i18n.Text("Reason"), Value: pamDialogValue(req.Reason)})
 	}
 	if req.IntentSummary != "" {
-		fields = append(fields, pamDialogField{Label: "Intent", Value: pamDialogValue(req.IntentSummary)})
+		fields = append(fields, pamDialogField{Label: i18n.Text("Intent"), Value: pamDialogValue(req.IntentSummary)})
 	}
 	return fields
 }
@@ -59,13 +60,13 @@ func pamDialogFields(req ipc.PamRequestDialog) []pamDialogField {
 // list the custom dialog draws.
 func buildPamDialogBody(req ipc.PamRequestDialog) string {
 	lines := []string{
-		"Breeze detected an elevation request.",
+		i18n.Text("Breeze detected an elevation request."),
 		"",
 	}
 	for _, field := range pamDialogFields(req) {
 		lines = append(lines, fmt.Sprintf("%s: %s", field.Label, field.Value))
 	}
-	lines = append(lines, "", "Approve this elevation request?")
+	lines = append(lines, "", i18n.Text("Approve this elevation request?"))
 	return strings.Join(lines, "\r\n")
 }
 
@@ -81,7 +82,7 @@ func formatPamCountdown(remaining time.Duration) string {
 func pamDialogValue(value string) string {
 	value = strings.TrimSpace(strings.ReplaceAll(value, "\x00", " "))
 	if value == "" {
-		return "Unknown"
+		return i18n.Text("Unknown")
 	}
 	return value
 }

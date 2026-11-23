@@ -933,6 +933,12 @@ describe('assignPolicy — duplicate assignment returns null instead of throwing
       })),
     } as any);
 
+    const tx = {
+      select: vi.fn().mockReturnValueOnce(selectLimitRows([{ parentPolicyId: null }])).mockReturnValueOnce(selectWhereRows([])),
+      execute: vi.fn().mockResolvedValue([]),
+      insert: db.insert,
+    };
+    vi.mocked(db.transaction).mockImplementation(async (fn: any) => fn(tx));
     const assignment = await assignPolicy('policy-1', 'device', 'device-1', 0, 'user-1');
     expect(assignment).toBeNull();
   });

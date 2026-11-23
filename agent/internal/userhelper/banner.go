@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"sync"
 
+	"github.com/breeze-rmm/agent/internal/i18n"
 	"github.com/breeze-rmm/agent/internal/ipc"
 )
 
@@ -40,7 +41,7 @@ var (
 func handleBannerShow(req ipc.BannerShowRequest) bool {
 	label := stripControl(trimNotifyField(req.Label, maxNotifyTitleBytes))
 	if label == "" {
-		label = "A technician is connected"
+		label = i18n.Text("A technician is connected")
 	}
 	bannerOpMu.Lock()
 	defer bannerOpMu.Unlock()

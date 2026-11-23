@@ -58,6 +58,10 @@ function mockOrgExists(exists: boolean) {
   });
 }
 
+vi.mock('../../services/helperBrandingPreview', () => ({
+  helperBrandingPreview: vi.fn(async () => ({ allowed: true, contexts: [] })),
+}));
+
 vi.mock('../../services/auditEvents', () => ({
   writeRouteAudit: vi.fn(),
 }));
@@ -628,6 +632,7 @@ describe('configurationPolicies CRUD routes', () => {
       expect(res.status).toBe(200);
       const json = await res.json();
       expect(json.id).toBe(POLICY_ID);
+      expect(json.helperBrandingPreview).toEqual({ allowed: true, contexts: [] });
     });
 
     it('returns 404 when policy not found', async () => {

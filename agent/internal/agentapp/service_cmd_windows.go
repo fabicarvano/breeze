@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/breeze-rmm/agent/internal/config"
+	"github.com/breeze-rmm/agent/internal/i18n"
 	"github.com/breeze-rmm/agent/internal/serviceinstall"
 	"github.com/breeze-rmm/agent/internal/winsvcinstall"
 	"github.com/spf13/cobra"
@@ -20,7 +21,7 @@ const windowsServiceName = "BreezeAgent"
 
 var serviceCmd = &cobra.Command{
 	Use:   "service",
-	Short: "Manage the Breeze Agent Windows service",
+	Short: i18n.Text("Manage the Breeze Agent Windows service"),
 }
 
 // reconcileServiceUnitIfNeeded is a no-op on Windows.
@@ -34,12 +35,12 @@ func init() {
 	serviceCmd.AddCommand(serviceUninstallCmd)
 	serviceCmd.AddCommand(serviceStartCmd)
 	serviceCmd.AddCommand(serviceStopCmd)
-	serviceInstallCmd.Flags().BoolVar(&noWatchdog, "no-watchdog", false, "Skip automatic watchdog installation")
+	serviceInstallCmd.Flags().BoolVar(&noWatchdog, "no-watchdog", false, i18n.Text("Skip automatic watchdog installation"))
 }
 
 var serviceInstallCmd = &cobra.Command{
 	Use:   "install",
-	Short: "Install the agent as a Windows service",
+	Short: i18n.Text("Install the agent as a Windows service"),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		exePath, err := os.Executable()
 		if err != nil {
@@ -95,7 +96,7 @@ var serviceInstallCmd = &cobra.Command{
 						"failed to install service binary in protected Program Files location: %w", err)
 				}
 				if copied {
-					fmt.Printf("Copied service binary to protected location: %s\n", path)
+					fmt.Printf(i18n.Text("Copied service binary to protected location: %s\n"), path)
 				}
 				serviceExePath = path
 				return path, nil
@@ -113,12 +114,12 @@ var serviceInstallCmd = &cobra.Command{
 
 		if !outcome.Started && installErr == nil {
 			fmt.Println()
-			fmt.Println("Next steps:")
+			fmt.Println(i18n.Text("Next steps:"))
 			if !enrolled {
-				fmt.Println("  1. Enroll: breeze-agent.exe enroll <key> --server https://your-server")
-				fmt.Println("  2. Start:  breeze-agent.exe service start")
+				fmt.Println(i18n.Text("  1. Enroll: breeze-agent.exe enroll <key> --server https://your-server"))
+				fmt.Println(i18n.Text("  2. Start:  breeze-agent.exe service start"))
 			} else {
-				fmt.Println("  1. Start:  breeze-agent.exe service start")
+				fmt.Println(i18n.Text("  1. Start:  breeze-agent.exe service start"))
 			}
 		}
 
@@ -161,7 +162,7 @@ var serviceInstallCmd = &cobra.Command{
 
 var serviceUninstallCmd = &cobra.Command{
 	Use:   "uninstall",
-	Short: "Uninstall the agent Windows service",
+	Short: i18n.Text("Uninstall the agent Windows service"),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		m, err := mgr.Connect()
 		if err != nil {
@@ -194,14 +195,14 @@ var serviceUninstallCmd = &cobra.Command{
 			return fmt.Errorf("failed to delete service: %w", err)
 		}
 
-		fmt.Printf("Service %q uninstalled.\n", windowsServiceName)
+		fmt.Printf(i18n.Text("Service %q uninstalled.\n"), windowsServiceName)
 		return nil
 	},
 }
 
 var serviceStartCmd = &cobra.Command{
 	Use:   "start",
-	Short: "Start the agent Windows service",
+	Short: i18n.Text("Start the agent Windows service"),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		m, err := winsvcinstall.Connect()
 		if err != nil {
@@ -216,14 +217,14 @@ var serviceStartCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Printf("Service %q started.\n", windowsServiceName)
+		fmt.Printf(i18n.Text("Service %q started.\n"), windowsServiceName)
 		return nil
 	},
 }
 
 var serviceStopCmd = &cobra.Command{
 	Use:   "stop",
-	Short: "Stop the agent Windows service",
+	Short: i18n.Text("Stop the agent Windows service"),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		m, err := mgr.Connect()
 		if err != nil {
@@ -242,7 +243,7 @@ var serviceStopCmd = &cobra.Command{
 			return fmt.Errorf("failed to stop service: %w", err)
 		}
 
-		fmt.Printf("Service %q stop requested.\n", windowsServiceName)
+		fmt.Printf(i18n.Text("Service %q stop requested.\n"), windowsServiceName)
 		return nil
 	},
 }

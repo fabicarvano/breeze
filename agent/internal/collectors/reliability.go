@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/breeze-rmm/agent/internal/branding"
 	"github.com/shirou/gopsutil/v3/host"
 )
 
@@ -395,6 +396,11 @@ func classifyEventLogEntry(metrics *ReliabilityMetrics, entry EventLogEntry) {
 	isScm := strings.Contains(src, "service control manager")
 	if isScm && scmFailureEventIDs[nid] {
 		svcName := parseServiceName(entry.Message, entry.Source)
+		if nid == 7031 {
+			if name, ok := entry.Details["serviceDisplayName"].(string); ok && strings.TrimSpace(name) != "" {
+				svcName = branding.CanonicalServiceName(name)
+			}
+		}
 		appendServiceFailure(metrics, svcName, ts, entry.EventID)
 		return
 	}

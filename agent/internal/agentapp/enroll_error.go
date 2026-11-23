@@ -11,6 +11,7 @@ import (
 
 	"github.com/breeze-rmm/agent/internal/config"
 	"github.com/breeze-rmm/agent/internal/eventlog"
+	"github.com/breeze-rmm/agent/internal/i18n"
 	"github.com/breeze-rmm/agent/pkg/api"
 )
 
@@ -128,7 +129,7 @@ func clearEnrollLastError() {
 // code. Never returns in production; tests inject a panicking osExit
 // stub so assertion code after the call is reachable via defer+recover.
 func enrollError(cat enrollErrCategory, friendly string, detail error) {
-	line := fmt.Sprintf("Enrollment failed: %s", friendly)
+	line := i18n.Format("Enrollment failed: %s", friendly)
 	if detail != nil {
 		line += fmt.Sprintf(" (%v)", detail)
 	}
@@ -198,9 +199,9 @@ func classifyIdentityConflict(httpErr *api.ErrHTTPStatus) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	return fmt.Sprintf(
+	return i18n.Format(
 		"enrollment blocked by an identity conflict — %s. An administrator must decommission the existing device first (Devices → select the device → Decommission) to free this hostname, or resolve the specific conflict directly (approve/un-quarantine the device, or clear its suspended agent token) before retrying.",
-		detail,
+		i18n.Text(detail),
 	), true
 }
 
@@ -224,15 +225,15 @@ func classifyEnrollError(err error, serverURL string) (enrollErrCategory, string
 		}
 		switch {
 		case httpErr.StatusCode == 401 || httpErr.StatusCode == 403:
-			return catAuth, "enrollment key not recognized — verify the key is active in Settings → Enrollment on the server"
+			return catAuth, i18n.Text("enrollment key not recognized — verify the key is active in Settings → Enrollment on the server")
 		case httpErr.StatusCode == 404:
-			return catNotFound, fmt.Sprintf(
+			return catNotFound, i18n.Format(
 				"enrollment endpoint not found on %s — check that SERVER_URL is correct (did you include /api or point at the wrong host?)",
 				serverURL)
 		case httpErr.StatusCode == 429:
-			return catRateLimit, "rate limited by server — wait one minute and retry the install"
+			return catRateLimit, i18n.Text("rate limited by server — wait one minute and retry the install")
 		case httpErr.StatusCode >= 500:
-			return catServer, fmt.Sprintf(
+			return catServer, i18n.Format(
 				"server error %d — contact Breeze support if this persists",
 				httpErr.StatusCode)
 		}
@@ -248,7 +249,7 @@ func classifyEnrollError(err error, serverURL string) (enrollErrCategory, string
 	// Network-layer errors come through as *url.Error wrapping dial/DNS/TLS/timeout.
 	var urlErr *url.Error
 	if errors.As(err, &urlErr) {
-		return catNetwork, fmt.Sprintf(
+		return catNetwork, i18n.Format(
 			"server unreachable at %s — check firewall, DNS, and that SERVER_URL is correct",
 			serverURL)
 	}

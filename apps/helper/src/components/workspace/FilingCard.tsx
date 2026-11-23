@@ -1,3 +1,4 @@
+import { useI18n } from '../../lib/i18n';
 import { useEffect, useRef, useState } from 'react';
 import type { FilingRecord, WorkspaceProject } from '../../stores/workspaceStore';
 import { toast } from '../ui/Toaster';
@@ -26,6 +27,7 @@ export interface FilingCardProps {
  * triggers the settle (fade/collapse) + confirmation toast.
  */
 export function FilingCard({ filing, projects, busy, onClassify, onAssign, viaDrop }: FilingCardProps) {
+  const t = useI18n();
   const subject = filing.emailMeta?.subject ?? filing.name;
   const decided = filing.status === 'confirmed' || filing.status === 'reassigned';
   const decidedLabel = filing.decidedProjectKey
@@ -38,10 +40,10 @@ export function FilingCard({ filing, projects, busy, onClassify, onAssign, viaDr
   useEffect(() => {
     if (decided && !wasDecided.current && viaDrop) {
       setSettling(true);
-      toast(`Filed to ${decidedLabel ?? 'project'}`);
+      toast(t('Filed to {project}', { project: decidedLabel ?? t('project') }));
     }
     wasDecided.current = decided;
-  }, [decided, decidedLabel, viaDrop]);
+  }, [decided, decidedLabel, viaDrop, t]);
 
   return (
     <div
@@ -55,19 +57,19 @@ export function FilingCard({ filing, projects, busy, onClassify, onAssign, viaDr
       </span>
 
       {decided && (
-        <span className="ws-chip ws-chip-success">Filed to: {decidedLabel}</span>
+        <span className="ws-chip ws-chip-success">{t('Filed to:')} {decidedLabel}</span>
       )}
       {!decided && filing.status === 'suggested' && filing.confidence === 'high' && (
         <span className="ws-chip ws-chip-success">
-          Filed to: {filing.suggestedProjectLabel} — {filing.rationale}
+          {t('Filed to:')} {filing.suggestedProjectLabel} — {filing.rationale}
         </span>
       )}
       {!decided && filing.status === 'suggested' && filing.confidence !== 'high' && (
         <>
           <span className="ws-chip ws-chip-warning">
             {filing.suggestedProjectLabel
-              ? `Possibly ${filing.suggestedProjectLabel} — ${filing.rationale}`
-              : 'No clear match — pick a project below.'}
+              ? t('Possibly {project} — {rationale}', { project: filing.suggestedProjectLabel, rationale: filing.rationale ?? '' })
+              : t('No clear match — pick a project below.')}
           </span>
           <select
             className="ws-filing-card-select"
@@ -76,9 +78,9 @@ export function FilingCard({ filing, projects, busy, onClassify, onAssign, viaDr
               const key = e.target.value;
               if (key) onAssign(filing.fileIndexId, key);
             }}
-            title="File to a different project"
+            title={t("File to a different project")}
           >
-            <option value="">Move to…</option>
+            <option value="">{t("Move to…")}</option>
             {projects.map((p) => (
               <option key={p.key} value={p.key}>
                 {p.key} {p.label}
@@ -94,18 +96,18 @@ export function FilingCard({ filing, projects, busy, onClassify, onAssign, viaDr
           <button
             className="helper-btn helper-btn-sm"
             onClick={() => onClassify(filing.fileIndexId)}
-            title="Suggest where this email belongs"
+            title={t("Suggest where this email belongs")}
           >
-            Sort
+            {t("Sort")}
           </button>
         )}
         {!busy && filing.status === 'suggested' && filing.suggestedProjectKey && (
           <button
             className="ws-btn-accent"
             onClick={() => onAssign(filing.fileIndexId, filing.suggestedProjectKey!)}
-            title="File to the suggested project"
+            title={t("File to the suggested project")}
           >
-            File it
+            {t("File it")}
           </button>
         )}
       </div>

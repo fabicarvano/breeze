@@ -1,9 +1,11 @@
+import { useBranding } from '../lib/branding';
+import { t, useI18n } from '../lib/i18n';
 // apps/helper/src/windows/ConsentDialog.tsx
 import { useEffect, useRef, useState } from "react";
 
 export interface ConsentRequest {
   sessionId: string;
-  technicianName: string | null;   // null => "A technician"
+  technicianName: string | null;   // null => t('A technician')
   technicianEmail: string | null;  // null => omit line
   orgName: string | null;
   timeoutMs: number;
@@ -20,6 +22,8 @@ export function ConsentDialog({
   /** False until the prompt is confirmed on screen (v2); the countdown starts then. */
   countdownRunning?: boolean;
 }) {
+  useI18n();
+  const company = useBranding((s) => s.values.companyName);
   const [remainingMs, setRemainingMs] = useState(req.timeoutMs);
   const denyRef = useRef<HTMLButtonElement>(null);
 
@@ -46,9 +50,9 @@ export function ConsentDialog({
   const countdown = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
   const urgent = secs <= 5;
   const label = req.onTimeout === "proceed"
-    ? `Connecting automatically in ${countdown}`
-    : `Declining automatically in ${countdown}`;
-  const name = req.technicianName ?? "A technician";
+    ? t('Connecting automatically in {countdown}', { countdown })
+    : t('Declining automatically in {countdown}', { countdown });
+  const name = req.technicianName ?? t('A technician');
   const initials = req.technicianName
     ? req.technicianName.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase()
     : "◐";
@@ -59,7 +63,7 @@ export function ConsentDialog({
       <div className="helper-consent-card">
         <div className="helper-consent-header">
           <span className="helper-consent-icon" aria-hidden>▣</span>
-          <span id="consent-title" className="helper-consent-title">Remote support request</span>
+          <span id="consent-title" className="helper-consent-title">{t('Remote support request')}</span>
         </div>
         <div className="helper-consent-body">
           <div className="helper-consent-identity">
@@ -70,17 +74,18 @@ export function ConsentDialog({
             </div>
           </div>
           <p id="consent-body" className="helper-consent-desc">
-            wants to start a remote session on this computer.
+            {t('wants to start a remote session on this computer.')}
           </p>
-          {req.orgName && <div className="helper-consent-meta">{req.orgName} · requested just now</div>}
+          {company && <div className="helper-consent-meta">{t('Support provider: {company}', { company })}</div>}
+          {req.orgName && <div className="helper-consent-meta">{req.orgName} · {t('requested just now')}</div>}
         </div>
         <div className="helper-consent-footer">
           <span className={`helper-consent-countdown${urgent ? " is-urgent" : ""}`}>{label}</span>
           <div className="helper-consent-actions">
             <button ref={denyRef} className="helper-btn helper-btn-deny"
-                    onClick={() => onDecision(false, "user")}>Deny</button>
+                    onClick={() => onDecision(false, "user")}>{t('Deny')}</button>
             <button className="helper-btn helper-btn-accept"
-                    onClick={() => onDecision(true, "user")}>Allow</button>
+                    onClick={() => onDecision(true, "user")}>{t('Allow')}</button>
           </div>
         </div>
       </div>

@@ -1,3 +1,4 @@
+import { t, useI18n } from '../../lib/i18n';
 import { useState } from 'react';
 import { getTauriInvoke } from '../../lib/helperFetch';
 import { useWorkspaceStore } from '../../stores/workspaceStore';
@@ -41,7 +42,7 @@ export async function openWorkspaceFile(
   try {
     const invoke = await getTauriInvoke();
     if (!invoke) {
-      throw new Error('Opening files requires the desktop app');
+      throw new Error(t('Opening files requires the desktop app'));
     }
     await invoke('open_workspace_path', { input: { path: openPath } });
     return true;
@@ -59,6 +60,7 @@ export async function openWorkspaceFile(
  * panel, so the layout stays fluid with no fixed widths.
  */
 export default function ChatFileCard({ files }: { files: WorkspaceFileSummary[] }) {
+  const t = useI18n();
   const username = useChatStore((s) => s.username);
   const [errorId, setErrorId] = useState<string | null>(null);
 
@@ -86,7 +88,7 @@ export default function ChatFileCard({ files }: { files: WorkspaceFileSummary[] 
               </span>
               {meta && <span className="helper-file-card-meta">{meta}</span>}
               {errorId === file.fileIndexId && (
-                <span className="helper-file-card-error">Couldn't open — path copied instead</span>
+                <span className="helper-file-card-error">{t("Couldn't open — path copied instead")}</span>
               )}
             </div>
             <button
@@ -95,7 +97,7 @@ export default function ChatFileCard({ files }: { files: WorkspaceFileSummary[] 
               onClick={() => handleOpen(file)}
               disabled={!file.openPath}
             >
-              Open
+              {t("Open")}
             </button>
           </div>
         );

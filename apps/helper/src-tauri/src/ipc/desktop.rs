@@ -170,7 +170,10 @@ pub fn show_consent_window(
         CONSENT_WINDOW_LABEL,
         WebviewUrl::App("index.html#consent".into()),
     )
-    .title("Remote Session Request")
+    .title(crate::locale::text(
+        "Remote Session Request",
+        "Solicitação de sessão remota",
+    ))
     .inner_size(380.0, 300.0)
     .center()
     .decorations(false)
@@ -244,7 +247,10 @@ pub fn show_banner_window(app: &AppHandle, req: &BannerShowRequest) {
         BANNER_WINDOW_LABEL,
         WebviewUrl::App("index.html#banner".into()),
     )
-    .title("Remote Session Active")
+    .title(crate::locale::text(
+        "Remote Session Active",
+        "Sessão remota ativa",
+    ))
     .inner_size(BANNER_W, BANNER_H)
     .decorations(false)
     .always_on_top(true)

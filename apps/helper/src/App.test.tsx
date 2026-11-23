@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 
 // jsdom doesn't implement scrollIntoView; ChatView's messages-end effect
 // calls it unconditionally on every render, which would otherwise throw the
@@ -42,6 +42,9 @@ vi.mock('./stores/workspaceStore', () => {
   return { useWorkspaceStore };
 });
 
+vi.mock('./lib/helperFetch', async (importOriginal) => ({ ...await importOriginal<typeof import('./lib/helperFetch')>(), getTauriInvoke: vi.fn() }));
+import { getTauriInvoke } from './lib/helperFetch';
+import { setHelperLocale } from './lib/i18n';
 import App from './App';
 import { useChatStore } from './stores/chatStore';
 import { useWorkspaceStore } from './stores/workspaceStore';
@@ -111,6 +114,8 @@ function setWorkspaceState(overrides: Record<string, unknown> = {}) {
 }
 
 beforeEach(() => {
+  setHelperLocale('en');
+  vi.mocked(getTauriInvoke).mockResolvedValue(null);
   vi.clearAllMocks();
   setChatState();
   setWorkspaceState();
@@ -159,4 +164,26 @@ it('shows the username prompt when no username is set yet', () => {
   render(<App />);
 
   expect(screen.getByText("What's your name?")).toBeInTheDocument();
+});
+
+
+afterEach(() => { setHelperLocale('en'); });
+it('localizes the actual connection error surface from local config even when agent initialization rejects', async () => {
+  const readAgent = vi.fn().mockRejectedValue(new Error('Agent configuration is corrupt'));
+  const invoke = vi.fn((command: string) => command === 'get_helper_config' ? Promise.resolve({ locale: 'pt-BR' }) : readAgent(command));
+  vi.mocked(getTauriInvoke).mockResolvedValue(invoke);
+  setChatState({ connectionState: 'error', connectionError: null, agentConfig: null });
+  render(<App />);
+  expect(await screen.findByRole('button', { name: 'Tentar novamente' })).toBeInTheDocument();
+  expect(screen.getByText('Falha ao conectar')).toBeInTheDocument();
+  await waitFor(() => expect(readAgent).toHaveBeenCalledWith('refresh_agent_config'));
+});
+it('keeps deterministic English error copy when local locale is unavailable', async () => {
+  const invoke = vi.fn().mockRejectedValue(new Error('local config unavailable'));
+  vi.mocked(getTauriInvoke).mockResolvedValue(invoke);
+  setChatState({ connectionState: 'error', connectionError: null, agentConfig: null });
+  render(<App />);
+  await waitFor(() => expect(invoke).toHaveBeenCalledWith('refresh_agent_config'));
+  expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+  expect(screen.getByText('Failed to connect')).toBeInTheDocument();
 });

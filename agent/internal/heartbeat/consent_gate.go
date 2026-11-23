@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/breeze-rmm/agent/internal/i18n"
 	"github.com/breeze-rmm/agent/internal/ipc"
 	"github.com/breeze-rmm/agent/internal/remote/desktop/x11"
 	"github.com/breeze-rmm/agent/internal/remote/tools"
@@ -753,11 +754,11 @@ func withConsentGranted(result tools.CommandResult, prompt *ipc.DesktopPrompt, v
 }
 
 func connectedNotifyBody(prompt *ipc.DesktopPrompt) string {
-	return technicianLine(prompt) + " connected to your computer"
+	return technicianLine(prompt) + i18n.Text(" connected to your computer")
 }
 
 func bannerLabel(prompt *ipc.DesktopPrompt) string {
-	return technicianLine(prompt) + " is connected"
+	return technicianLine(prompt) + i18n.Text(" is connected")
 }
 
 // technicianLine renders the who-is-this prefix: "Billy from Olive Technology",
@@ -769,13 +770,13 @@ func technicianLine(prompt *ipc.DesktopPrompt) string {
 	org := derefString(prompt.OrgName)
 	switch {
 	case name != "" && org != "":
-		return name + " from " + org
+		return name + i18n.Text(" from ") + org
 	case name != "":
 		return name
 	case org != "":
-		return "A technician from " + org
+		return i18n.Text("A technician from ") + org
 	default:
-		return "A technician"
+		return i18n.Text("A technician")
 	}
 }
 

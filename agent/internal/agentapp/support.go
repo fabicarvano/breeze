@@ -17,6 +17,7 @@ import (
 	"github.com/breeze-rmm/agent/internal/collectors"
 	"github.com/breeze-rmm/agent/internal/config"
 	"github.com/breeze-rmm/agent/internal/hostpolicy"
+	"github.com/breeze-rmm/agent/internal/i18n"
 	"github.com/breeze-rmm/agent/internal/logging"
 	"github.com/breeze-rmm/agent/pkg/api"
 	"github.com/spf13/cobra"
@@ -40,8 +41,8 @@ var supportCode string
 
 var supportCmd = &cobra.Command{
 	Use:   "support",
-	Short: "Run a one-time Quick Support session (nothing is installed)",
-	Long: `Runs this binary as an ephemeral Breeze Quick Support client.
+	Short: i18n.Text("Run a one-time Quick Support session (nothing is installed)"),
+	Long: i18n.Text(`Runs this binary as an ephemeral Breeze Quick Support client.
 
 The client redeems a one-time support code, enrolls a temporary device into a
 directory under the system temp folder, serves a single remote-support session,
@@ -50,7 +51,7 @@ Breeze agent on this machine is touched.
 
 The code and server are normally embedded in the downloaded filename
 (breeze-support-<CODE>-<host>.exe); --code / --server override them, and if
-neither is available the client prompts.`,
+neither is available the client prompts.`),
 	Run: func(cmd *cobra.Command, args []string) {
 		runSupportSession()
 	},
@@ -233,10 +234,10 @@ const (
 // not supply one (or it could not be parsed).
 func supportWatchdogDecision(now, disconnectedSince, hardExpiresAt time.Time) string {
 	if !hardExpiresAt.IsZero() && now.After(hardExpiresAt) {
-		return "This support session has expired. Closing."
+		return i18n.Text("This support session has expired. Closing.")
 	}
 	if !disconnectedSince.IsZero() && now.Sub(disconnectedSince) >= supportDisconnectGrace {
-		return fmt.Sprintf("Lost contact with the Breeze server for %s. Closing.", supportDisconnectGrace)
+		return i18n.Format("Lost contact with the Breeze server for %s. Closing.", supportDisconnectGrace)
 	}
 	return ""
 }
@@ -262,7 +263,7 @@ func promptSupportInput(prefillServer string) (code, server string, err error) {
 		server = strings.TrimSpace(defaultSupportServer)
 	}
 	if server == "" {
-		fmt.Print("Breeze server URL (e.g. https://rmm.example.com): ")
+		fmt.Print(i18n.Text("Breeze server URL (e.g. https://rmm.example.com): "))
 		line, readErr := reader.ReadString('\n')
 		if readErr != nil && strings.TrimSpace(line) == "" {
 			return "", "", fmt.Errorf("could not read the server URL: %w", readErr)
@@ -277,7 +278,7 @@ func promptSupportInput(prefillServer string) (code, server string, err error) {
 	}
 
 	for attempt := 0; attempt < 3; attempt++ {
-		fmt.Print("Enter the support code your technician gave you: ")
+		fmt.Print(i18n.Text("Enter the support code your technician gave you: "))
 		line, readErr := reader.ReadString('\n')
 		candidate := normalizeSupportCode(line)
 		if candidate != "" && supportCodeRe.MatchString(candidate) {
@@ -286,7 +287,7 @@ func promptSupportInput(prefillServer string) (code, server string, err error) {
 		if readErr != nil {
 			return "", server, fmt.Errorf("could not read the support code: %w", readErr)
 		}
-		fmt.Println("That doesn't look like a support code — it's 9 characters, like 234-567-892.")
+		fmt.Println(i18n.Text("That doesn't look like a support code — it's 9 characters, like 234-567-892."))
 	}
 	return "", server, errors.New("no valid support code entered")
 }
@@ -331,7 +332,7 @@ func runSupportSession() {
 		}
 		code, server, err = promptSupportInput(server)
 		if err != nil {
-			supportFail("Quick Support could not start.", err)
+			supportFail(i18n.Text("Quick Support could not start."), err)
 			return
 		}
 	}
@@ -339,16 +340,16 @@ func runSupportSession() {
 		server = strings.TrimSpace(defaultSupportServer)
 	}
 	if server == "" {
-		supportFail("Quick Support could not start: no Breeze server URL. Re-download the client from your technician's link.", nil)
+		supportFail(i18n.Text("Quick Support could not start: no Breeze server URL. Re-download the client from your technician's link."), nil)
 		return
 	}
 
-	fmt.Println("Breeze Quick Support")
-	fmt.Println("Connecting…")
+	fmt.Println(i18n.Text("Breeze Quick Support"))
+	fmt.Println(i18n.Text("Connecting…"))
 
 	workDir, err := prepareSupportWorkDir()
 	if err != nil {
-		supportFail("Could not create a temporary working folder for this session.", err)
+		supportFail(i18n.Text("Could not create a temporary working folder for this session."), err)
 		return
 	}
 	supportCfgFile := filepath.Join(workDir, "agent.yaml")
@@ -399,7 +400,7 @@ func runSupportSession() {
 
 	if err := gateSupportServer(server); err != nil {
 		discardSupportWorkDir(workDir)
-		supportFail("This build can only contact its configured Breeze server. Ask your technician for a new code.", err)
+		supportFail(i18n.Text("This build can only contact its configured Breeze server. Ask your technician for a new code."), err)
 		return
 	}
 
@@ -409,10 +410,10 @@ func runSupportSession() {
 		if errors.Is(err, api.ErrSupportCodeInvalid) {
 			// The person reading this is not technical and did not choose the
 			// code — name the remedy, not the status.
-			supportFail("That code is invalid or has expired — ask your technician for a new one.", nil)
+			supportFail(i18n.Text("That code is invalid or has expired — ask your technician for a new one."), nil)
 			return
 		}
-		supportFail("Could not reach the Breeze server. Check your internet connection and try again.", err)
+		supportFail(i18n.Text("Could not reach the Breeze server. Check your internet connection and try again."), err)
 		return
 	}
 
@@ -424,7 +425,7 @@ func runSupportSession() {
 	if strings.TrimSpace(resp.ServerURL) != "" {
 		if err := gateSupportServer(resp.ServerURL); err != nil {
 			discardSupportWorkDir(workDir)
-			supportFail("This build can only contact its configured Breeze server. Ask your technician for a new code.", err)
+			supportFail(i18n.Text("This build can only contact its configured Breeze server. Ask your technician for a new code."), err)
 			return
 		}
 		cfg.ServerURL = strings.TrimSpace(resp.ServerURL)
@@ -445,7 +446,7 @@ func runSupportSession() {
 
 	if err := enrollSupportSession(cfg, supportCfgFile, resp.EnrollmentKey, resp.EnrollmentSecret); err != nil {
 		discardSupportWorkDir(workDir)
-		supportFail("Could not start the support session. Ask your technician for a new code.", err)
+		supportFail(i18n.Text("Could not start the support session. Ask your technician for a new code."), err)
 		return
 	}
 
@@ -453,14 +454,14 @@ func runSupportSession() {
 		// Interrupted during enrollment — stop at the first point where doing
 		// so is clean, rather than bringing an agent up just to tear it down.
 		discardSupportWorkDir(workDir)
-		fmt.Println("Cancelled. Nothing was left installed.")
+		fmt.Println(i18n.Text("Cancelled. Nothing was left installed."))
 		return
 	}
 
 	comps, err := startAgentFn(cfg)
 	if err != nil {
 		discardSupportWorkDir(workDir)
-		supportFail("Could not start the support session on this computer.", err)
+		supportFail(i18n.Text("Could not start the support session on this computer."), err)
 		return
 	}
 	defer logging.StopShipper()
@@ -473,7 +474,7 @@ func runSupportSession() {
 	// callbacks, so the server still receives the peer-disconnect report.
 	stopIndicator := startSupportIndicator(comps.hb)
 
-	fmt.Print(supportBanner)
+	fmt.Print(i18n.Text(supportBanner))
 
 	hardExpiresAt := parseSupportHardExpiry(resp.HardExpiresAt)
 	notice := runSupportWatchdog(ctx, comps, hardExpiresAt)
@@ -482,7 +483,7 @@ func runSupportSession() {
 		fmt.Println(notice)
 	} else {
 		fmt.Println()
-		fmt.Println("Ending the support session…")
+		fmt.Println(i18n.Text("Ending the support session…"))
 	}
 
 	// Teardown order:
@@ -497,7 +498,7 @@ func runSupportSession() {
 	shutdownAgent(comps)
 	comps.hb.RunSupportCleanup()
 	stopIndicator()
-	fmt.Println("Support session ended. Nothing was left installed.")
+	fmt.Println(i18n.Text("Support session ended. Nothing was left installed."))
 }
 
 // enrollWithConfigFn is enrollWithConfig, swappable so a test can stand in for

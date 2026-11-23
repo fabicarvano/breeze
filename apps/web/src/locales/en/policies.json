@@ -703,7 +703,44 @@
         "showOpenPortal": "showOpenPortal",
         "showDeviceInfo": "showDeviceInfo",
         "showRequestSupport": "showRequestSupport",
-        "portalUrl": "portalUrl"
+        "portalUrl": "portalUrl",
+        "branding": {
+          "title": "Helper branding",
+          "help": "Blank fields inherit the partner value or Breeze default. Text is shown as entered in every language.",
+          "unavailable": "Branding is available only for partner and organization assignments. Site, group and device policies configure operational settings only.",
+          "previewContext": "Preview inheritance for",
+          "inherited": "Inherited: {{value}} ({{source}})",
+          "loading": "Loading inheritance from the server…",
+          "invalidText": "Use plain text without control characters, up to {{limit}} characters.",
+          "invalidColor": "Use a six-digit hex color, such as #2563EB.",
+          "fields": {
+            "displayName": "Display name",
+            "companyName": "Company name",
+            "welcomeTitle": "Welcome title",
+            "welcomeMessage": "Welcome message",
+            "supportLabel": "Support label",
+            "portalLabel": "Portal label",
+            "primaryColor": "Primary color",
+            "accentColor": "Accent color"
+          },
+          "sources": {
+            "default": "Breeze default",
+            "partner": "Partner policy",
+            "organization": "Organization policy"
+          },
+          "defaults": {
+            "displayName": "Breeze Helper",
+            "companyName": "No company name",
+            "welcomeTitle": "Welcome to Breeze Helper",
+            "welcomeMessage": "Ask me anything about your computer.",
+            "supportLabel": "Request Support",
+            "portalLabel": "Open Breeze Portal",
+            "primaryColor": "Breeze theme color",
+            "accentColor": "Breeze theme color"
+          },
+          "noAssignments": "Assign this policy to a partner or organization to preview inherited values.",
+          "selfPartnerDefault": "This policy supplies both the partner default and organization override. Editing changes both levels; a blank field uses the Breeze default."
+        }
       },
       "inlineEntityPicker": {
         "search": "Search...",

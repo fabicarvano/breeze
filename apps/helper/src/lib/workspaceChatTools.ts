@@ -1,3 +1,4 @@
+import { t } from './i18n';
 // Workspace chat tools: the two client-declared tools the helper exposes to the
 // chat model, plus their client-side executors. The declarations are sent to
 // core at session creation (chatStore); execution happens here against the
@@ -117,7 +118,7 @@ export async function executeWorkspaceChatTool(
 ): Promise<unknown> {
   try {
     const config = useChatStore.getState().agentConfig;
-    if (!config) return { error: 'Workspace is not connected.' };
+    if (!config) return { error: t(t("Workspace is not connected.")) };
 
     if (name === 'search_workspace_files') {
       const params = new URLSearchParams({ q: queryString(input.q) });
@@ -127,7 +128,7 @@ export async function executeWorkspaceChatTool(
       const res = await helperRequest(config, workspaceUrl(config, '/search', params), {
         method: 'GET',
       });
-      if (!res.ok) return { error: errorString(res.body, 'File search is unavailable right now.') };
+      if (!res.ok) return { error: errorString(res.body, t(t("File search is unavailable right now."))) };
 
       const data = JSON.parse(res.body) as { results?: SearchResultFile[] };
       const files = (data.results ?? []).slice(0, FILE_LIMIT).map((f) => ({
@@ -151,7 +152,7 @@ export async function executeWorkspaceChatTool(
         method: 'GET',
       });
       if (!res.ok) {
-        return { error: errorString(res.body, 'Passage retrieval is unavailable right now.') };
+        return { error: errorString(res.body, t(t("Passage retrieval is unavailable right now."))) };
       }
 
       const data = JSON.parse(res.body) as { passages?: PassageRow[] };

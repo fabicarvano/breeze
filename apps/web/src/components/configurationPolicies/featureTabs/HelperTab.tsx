@@ -6,7 +6,9 @@ import { useFeatureLink } from "./useFeatureLink";
 import FeatureTabShell from "./FeatureTabShell";
 import { useTranslation } from "react-i18next";
 import { i18n } from "@/lib/i18n";
+import HelperBrandingFields, { brandingIsValid, brandingPayload, type HelperBranding } from "./HelperBrandingFields";
 type HelperSettings = {
+  branding?: HelperBranding;
   enabled: boolean;
   /**
    * Whether the tray icon is drawn at all. Independent of the menu-item
@@ -35,6 +37,7 @@ export default function HelperTab({
   onLinkChanged,
   linkedPolicyId,
   parentLink,
+  helperBrandingPreview,
 }: FeatureTabProps) {
   useTranslation("policies");
   const { save, remove, saving, error, clearError } = useFeatureLink(policyId);
@@ -44,14 +47,15 @@ export default function HelperTab({
     ...defaults,
     ...(effectiveLink?.inlineSettings as Partial<HelperSettings> | undefined),
   }));
+  const [branding, setBranding] = useState<HelperBranding>(() =>
+    (existingLink?.inlineSettings?.branding as HelperBranding | undefined) ?? {});
   useEffect(() => {
+    setBranding((existingLink?.inlineSettings?.branding as HelperBranding | undefined) ?? {});
     const link = existingLink ?? parentLink;
-    if (link?.inlineSettings) {
-      setSettings((prev) => ({
-        ...prev,
-        ...(link.inlineSettings as Partial<HelperSettings>),
-      }));
-    }
+    setSettings({
+      ...defaults,
+      ...(link?.inlineSettings as Partial<HelperSettings> | undefined),
+    });
   }, [existingLink, parentLink]);
   const update = <K extends keyof HelperSettings>(
     key: K,
@@ -59,7 +63,11 @@ export default function HelperTab({
   ) => setSettings((prev) => ({ ...prev, [key]: value }));
   const handleSave = async () => {
     clearError();
+    if (!brandingIsValid(branding) || (Object.keys(brandingPayload(branding)).length > 0 && !helperBrandingPreview)) return;
     const payload: HelperSettings = { ...settings };
+    delete payload.branding;
+    const ownBranding = brandingPayload(branding);
+    if (Object.keys(ownBranding).length && helperBrandingPreview?.allowed) payload.branding = ownBranding;
     if (!payload.portalUrl) delete payload.portalUrl;
     if (payload.lifecycleMode === "auto") delete payload.lifecycleMode;
     const result = await save(existingLink?.id ?? null, {
@@ -76,7 +84,11 @@ export default function HelperTab({
   };
   const handleOverride = async () => {
     clearError();
+    if (!brandingIsValid(branding) || (Object.keys(brandingPayload(branding)).length > 0 && !helperBrandingPreview)) return;
     const payload: HelperSettings = { ...settings };
+    delete payload.branding;
+    const ownBranding = brandingPayload(branding);
+    if (Object.keys(ownBranding).length && helperBrandingPreview?.allowed) payload.branding = ownBranding;
     if (!payload.portalUrl) delete payload.portalUrl;
     if (payload.lifecycleMode === "auto") delete payload.lifecycleMode;
     const result = await save(null, {
@@ -100,6 +112,7 @@ export default function HelperTab({
       isConfigured={!!existingLink || isInherited}
       configuredButInactive={!!existingLink && !settings.enabled}
       saving={saving}
+      saveDisabled={!brandingIsValid(branding) || (Object.keys(brandingPayload(branding)).length > 0 && !helperBrandingPreview)}
       error={error}
       onSave={handleSave}
       onRemove={existingLink && !linkedPolicyId ? handleRemove : undefined}
@@ -112,6 +125,7 @@ export default function HelperTab({
       }
     >
       <div className="space-y-6">
+        <HelperBrandingFields value={branding} onChange={setBranding} preview={helperBrandingPreview} />
         {/* Deploy toggle */}
         <div className="flex items-center justify-between rounded-md border bg-background px-4 py-3">
           <div>

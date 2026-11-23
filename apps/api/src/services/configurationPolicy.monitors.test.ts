@@ -457,7 +457,7 @@ describe('removeFeatureLink — settings owner retention', () => {
     lock.from.mockReturnValue(lock);
     lock.where.mockReturnValue(lock);
     const tx = {
-      select: vi.fn().mockReturnValueOnce(lock).mockReturnValueOnce(
+      select: vi.fn().mockReturnValueOnce(selectLimitRows([{ featureType }])).mockReturnValueOnce(lock).mockReturnValueOnce(
         selectLimitRows(interval === null ? [] : [{ checkIntervalSeconds: interval }])),
       delete: vi.fn(() => ({ where: vi.fn(async () => []) })),
       update: vi.fn(() => ({ set: vi.fn((values) => ({

@@ -9,6 +9,7 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/breeze-rmm/agent/internal/i18n"
 	"github.com/breeze-rmm/agent/internal/ipc"
 )
 
@@ -189,7 +190,7 @@ type pamDialogState struct {
 
 var (
 	pamDialogStatesMu sync.Mutex
-	pamDialogStates   = map[uintptr]*pamDialogState{}
+	pamDialogStates           = map[uintptr]*pamDialogState{}
 	pamDialogNextID   uintptr = 1
 
 	pamWndProcCallback uintptr
@@ -259,7 +260,7 @@ var (
 func pamUTF16(s string) []uint16 {
 	u, err := syscall.UTF16FromString(s)
 	if err != nil {
-		u, _ = syscall.UTF16FromString("Unknown")
+		u, _ = syscall.UTF16FromString(i18n.Text("Unknown"))
 	}
 	return u
 }
@@ -331,7 +332,7 @@ func showPamDialogWindow(req ipc.PamRequestDialog) (result ipc.PamDialogResult, 
 	state := &pamDialogState{
 		dpi:      pamSystemDPI(),
 		headline: pamUTF16(pamDialogHeadline(req)),
-		subline:  pamUTF16("Breeze intercepted an elevation request on this device."),
+		subline:  pamUTF16(i18n.Text("Breeze intercepted an elevation request on this device.")),
 		fields:   pamDialogFields(req),
 		hasCount: req.TimeoutSeconds > 0,
 	}
@@ -344,15 +345,15 @@ func showPamDialogWindow(req ipc.PamRequestDialog) (result ipc.PamDialogResult, 
 
 	// Layout (96-dpi units, scaled at draw/create time).
 	const (
-		designWidth  = 520
-		margin       = 24
-		headerH      = 56 // icon + headline + subline block
-		fieldRowH    = 26
-		countBlockH  = 34 // countdown text + progress bar
-		buttonH      = 30
-		buttonW      = 104
-		footerGap    = 20
-		sectionGap   = 14
+		designWidth = 520
+		margin      = 24
+		headerH     = 56 // icon + headline + subline block
+		fieldRowH   = 26
+		countBlockH = 34 // countdown text + progress bar
+		buttonH     = 30
+		buttonW     = 104
+		footerGap   = 20
+		sectionGap  = 14
 	)
 	state.margin = state.scale(margin)
 	state.labelWidth = state.scale(110)
@@ -398,7 +399,7 @@ func showPamDialogWindow(req ipc.PamRequestDialog) (result ipc.PamDialogResult, 
 	}
 
 	className := pamUTF16(pamWndClassName)
-	title := pamUTF16(pamDialogTitle)
+	title := pamUTF16(i18n.Text(pamDialogTitle))
 	hwnd, _, callErr := procPamCreateWindowExW.Call(
 		exStyle,
 		uintptr(unsafe.Pointer(&className[0])),
@@ -455,8 +456,8 @@ func pamCreateButtons(hwnd, hInstance uintptr, state *pamDialogState) bool {
 	denyX := approveX - gap - buttonW
 
 	buttonClass := pamUTF16("BUTTON")
-	denyLabel := pamUTF16("&Deny")
-	approveLabel := pamUTF16("&Approve")
+	denyLabel := pamUTF16(i18n.Text("&Deny"))
+	approveLabel := pamUTF16(i18n.Text("&Approve"))
 
 	deny, _, _ := procPamCreateWindowExW.Call(
 		0,
@@ -615,7 +616,7 @@ func pamPaint(hwnd uintptr, state *pamDialogState) {
 			remaining = 0
 		}
 		countRect := pamRect{m, state.countTop, state.width - m, state.countTop + state.scale(18)}
-		countdown := pamUTF16("Expires in " + formatPamCountdown(remaining))
+		countdown := pamUTF16(i18n.Text("Expires in ") + formatPamCountdown(remaining))
 		pamDrawText(hdc, countdown, &countRect, state.fontBody, pamColGray, pamDTSingleLine|pamDTNoPrefix)
 
 		barTop := state.countTop + state.scale(22)

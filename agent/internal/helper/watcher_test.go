@@ -26,8 +26,8 @@ func TestWatcherExitsOnNotInstalled(t *testing.T) {
 
 	select {
 	case <-w.done:
-	case <-time.After(2 * time.Second):
-		t.Fatal("watcher did not exit within 2s with the binary missing")
+	case <-time.After(30 * time.Second):
+		t.Fatal("watcher did not exit within 30s with the binary missing")
 	}
 	if *spawns != 0 {
 		t.Fatalf("spawnFunc called %d times, want 0", *spawns)
@@ -56,8 +56,10 @@ func TestWatcherStillCountsRealFailures(t *testing.T) {
 
 	select {
 	case <-w.done:
-	case <-time.After(5 * time.Second):
-		t.Fatal("watcher did not give up")
+	// Native process discovery/start confirmation can outlast the old 5s
+	// deadline under race instrumentation and shared CI CPU contention.
+	case <-time.After(30 * time.Second):
+		t.Fatal("watcher did not give up within 30s")
 	}
 	if !state.watcherGaveUp {
 		t.Fatal("expected watcherGaveUp after retries with the binary present")

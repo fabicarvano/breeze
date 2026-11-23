@@ -580,3 +580,14 @@ func TestHandleConsentCancelClosesTheActiveDialog(t *testing.T) {
 		t.Fatal("a cancelled prompt must release the in-progress guard")
 	}
 }
+
+func TestConsentCopyPortugueseKeepsFixedBody(t *testing.T) {
+	title, body := buildConsentDialogTextForLocale("pt-BR", ipc.ConsentRequest{TechnicianName: "Fabio", OrgName: "Cliente"})
+	if title != "Solicitação de suporte remoto" || body != "Fabio de Cliente está solicitando acesso remoto para visualizar e controlar este computador." {
+		t.Fatalf("%q %q", title, body)
+	}
+	fallbackTitle, fallbackBody := buildConsentDialogTextForLocale("de-DE", ipc.ConsentRequest{})
+	if fallbackTitle != "Remote Support Request" || fallbackBody != "A technician is requesting remote access to view and control this computer." {
+		t.Fatalf("%q %q", fallbackTitle, fallbackBody)
+	}
+}

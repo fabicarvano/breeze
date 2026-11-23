@@ -8,7 +8,7 @@
 package patching
 
 import (
-	"fmt"
+	"github.com/breeze-rmm/agent/internal/i18n"
 	"time"
 )
 
@@ -47,7 +47,7 @@ const minRebootPromptWindow = 20 * time.Second
 // rebootActionPostpone renders the postponement button. The label carries the
 // window because "Postpone" alone gives the user no way to judge the offer.
 func rebootActionPostpone(d time.Duration) string {
-	return "Postpone " + humanizeRebootDelay(d)
+	return "Postpone " + humanizeRebootDelayLocale(d, "en")
 }
 
 // rebootRung is one warning in the ladder plus the prompt policy that applies to
@@ -119,16 +119,16 @@ func rebootDeferralNote(policy DeferralPolicy, used int, canPostpone bool) strin
 		return ""
 	}
 	if !canPostpone {
-		return "This restart can no longer be postponed."
+		return i18n.Text("This restart can no longer be postponed.")
 	}
 	remaining := policy.MaxDeferrals - used
 	if remaining <= 0 {
-		return "This restart can no longer be postponed."
+		return i18n.Text("This restart can no longer be postponed.")
 	}
 	if remaining == 1 {
-		return "You can postpone this restart 1 more time."
+		return i18n.Text("You can postpone this restart 1 more time.")
 	}
-	return fmt.Sprintf("You can postpone this restart %d more times.", remaining)
+	return i18n.Format("You can postpone this restart %d more times.", remaining)
 }
 
 // rebootPromptBody joins the plan's warning text with the deferral note.

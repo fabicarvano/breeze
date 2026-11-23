@@ -4,6 +4,7 @@ package userhelper
 
 import (
 	"fmt"
+	"github.com/breeze-rmm/agent/internal/i18n"
 	"runtime"
 	"sync"
 	"syscall"
@@ -45,15 +46,15 @@ var (
 	procBannerSetTimer        = pamDialogUser32.NewProc("SetTimer")
 	procGetModuleHandleW      = syscall.NewLazyDLL("kernel32.dll").NewProc("GetModuleHandleW")
 
-	procCreateSolidBrush      = bannerGdi32.NewProc("CreateSolidBrush")
-	procSetBkMode             = bannerGdi32.NewProc("SetBkMode")
-	procSetTextColor          = bannerGdi32.NewProc("SetTextColor")
-	procBannerCreateFontW     = bannerGdi32.NewProc("CreateFontW")
-	procBannerSelectObject    = bannerGdi32.NewProc("SelectObject")
-	procBannerDeleteObject    = bannerGdi32.NewProc("DeleteObject")
-	procBannerEllipse         = bannerGdi32.NewProc("Ellipse")
-	procBannerGetStockObject  = bannerGdi32.NewProc("GetStockObject")
-	procBannerCreateRoundRgn  = bannerGdi32.NewProc("CreateRoundRectRgn")
+	procCreateSolidBrush     = bannerGdi32.NewProc("CreateSolidBrush")
+	procSetBkMode            = bannerGdi32.NewProc("SetBkMode")
+	procSetTextColor         = bannerGdi32.NewProc("SetTextColor")
+	procBannerCreateFontW    = bannerGdi32.NewProc("CreateFontW")
+	procBannerSelectObject   = bannerGdi32.NewProc("SelectObject")
+	procBannerDeleteObject   = bannerGdi32.NewProc("DeleteObject")
+	procBannerEllipse        = bannerGdi32.NewProc("Ellipse")
+	procBannerGetStockObject = bannerGdi32.NewProc("GetStockObject")
+	procBannerCreateRoundRgn = bannerGdi32.NewProc("CreateRoundRectRgn")
 )
 
 const (
@@ -174,10 +175,10 @@ func bannerEnsureFont() uintptr {
 	face, _ := syscall.UTF16FromString("Segoe UI")
 	font, _, _ = procBannerCreateFontW.Call(
 		uintptr(height), 0, 0, 0,
-		600,           // weight
+		600, // weight
 		0, 0, 0,
-		1, 0, 0,       // DEFAULT_CHARSET
-		5, 0,          // CLEARTYPE_QUALITY
+		1, 0, 0, // DEFAULT_CHARSET
+		5, 0, // CLEARTYPE_QUALITY
 		uintptr(unsafe.Pointer(&face[0])),
 	)
 	bannerMu.Lock()
@@ -422,7 +423,7 @@ func bannerWindowLoop(ready chan<- uintptr, abandoned <-chan struct{}) {
 		x = 0
 	}
 	className, _ := syscall.UTF16PtrFromString("BreezeSessionBanner")
-	title, _ := syscall.UTF16PtrFromString("Remote session active")
+	title, _ := syscall.UTF16PtrFromString(i18n.Text("Remote session active"))
 	hInst, _, _ := procGetModuleHandleW.Call(0)
 	hwnd, _, _ := procCreateWindowExW.Call(
 		bwsExTopmost|bwsExToolwindow|bwsExNoactivate|bwsExLayered|bwsExTransparent,

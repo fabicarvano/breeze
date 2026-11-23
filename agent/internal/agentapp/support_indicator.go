@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/breeze-rmm/agent/internal/heartbeat"
+	"github.com/breeze-rmm/agent/internal/i18n"
 	"github.com/breeze-rmm/agent/internal/userhelper"
 )
 
@@ -73,7 +74,7 @@ const supportViewingSuffix = " is viewing your screen"
 
 func supportViewerName(viewer string) string {
 	if viewer == "" {
-		return "A technician"
+		return i18n.Text("A technician")
 	}
 	return viewer
 }
@@ -83,8 +84,8 @@ func supportViewerName(viewer string) string {
 // removed, and a long name is shortened (on a character boundary) so the
 // sentence always fits the banner's label limit whole.
 func supportViewingLabel(viewer string) string {
-	name := userhelper.DisplayNameWithin(viewer, userhelper.MaxBannerLabelBytes-len(supportViewingSuffix))
-	return supportViewerName(name) + supportViewingSuffix
+	name := userhelper.DisplayNameWithin(viewer, userhelper.MaxBannerLabelBytes-len(i18n.Text(supportViewingSuffix)))
+	return supportViewerName(name) + i18n.Text(supportViewingSuffix)
 }
 
 // reconcile makes the indicator match the current facts. The console line

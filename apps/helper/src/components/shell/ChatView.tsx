@@ -1,3 +1,5 @@
+import { useBranding, brandingDefaults } from '../../lib/branding';
+import { t, useI18n } from '../../lib/i18n';
 import { useEffect, useMemo, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -134,9 +136,10 @@ function withCitations(
 }
 
 function ToolCallIndicator({ toolName }: { toolName?: string }) {
+  useI18n();
   const label = toolName
-    ? `Using ${toolName.replace(/_/g, ' ')}...`
-    : 'Checking your system...';
+    ? t('Using {tool}...', { tool: toolName.replace(/_/g, ' ') })
+    : t('Checking your system...');
   return (
     <div className="helper-tool-indicator text-ws-secondary">
       <span className="helper-spinner" />
@@ -146,13 +149,14 @@ function ToolCallIndicator({ toolName }: { toolName?: string }) {
 }
 
 function ThinkingIndicator() {
+  useI18n();
   return (
     <div className="helper-message helper-message-assistant bg-ws-surface rounded-surface shadow-[var(--ws-shadow-1)]">
       <div className="helper-thinking">
         <span className="helper-thinking-dot" />
         <span className="helper-thinking-dot" />
         <span className="helper-thinking-dot" />
-        <span className="helper-thinking-label text-ws-secondary">Thinking</span>
+        <span className="helper-thinking-label text-ws-secondary">{t('Thinking')}</span>
       </div>
     </div>
   );
@@ -165,6 +169,9 @@ export default function ChatView({
   draft: string;
   setDraft: (value: string) => void;
 }) {
+  useI18n();
+  const brandingValues = useBranding((s) => s.values);
+  const branding = brandingDefaults(brandingValues);
   const { messages, isStreaming, username, sendMessage } = useChatStore();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileResolutionMap = useMemo(() => buildFileResolutionMap(messages), [messages]);
@@ -193,8 +200,8 @@ export default function ChatView({
       <div className="helper-messages" data-testid="chat-view">
         {messages.length === 0 && (
           <div className="helper-empty text-ws-secondary">
-            <p>Hi{username ? `, ${username}` : ''}! I'm Breeze Helper.</p>
-            <p>Ask me anything about your computer.</p>
+            <p>{brandingValues.welcomeTitle ?? t("Hi{username}! I'm {name}.", { username: username ? `, ${username}` : '', name: branding.displayName })}</p>
+            <p>{branding.welcomeMessage}</p>
           </div>
         )}
 
@@ -258,7 +265,7 @@ export default function ChatView({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Ask me anything..."
+          placeholder={t('Ask me anything...')}
           disabled={isStreaming}
           rows={1}
           className="helper-input bg-ws-canvas text-ws-ink"
@@ -268,7 +275,7 @@ export default function ChatView({
           disabled={isStreaming || !draft.trim()}
           className="helper-btn helper-btn-send bg-ws-accent text-[var(--ws-accent-contrast)]"
         >
-          Send
+          {t('Send')}
         </button>
       </form>
     </>

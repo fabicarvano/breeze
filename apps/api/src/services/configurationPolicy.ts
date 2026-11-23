@@ -1,3 +1,5 @@
+import { helperBrandingSchema } from '@breeze/shared/validators/helperBranding';
+import { assertHelperBrandingWriteLevels, assertHelperBrandingAssignment, lockHelperBrandingPolicy, assertHelperBrandingRemoval } from './helperBrandingPolicy';
 import { db } from '../db';
 import { readWithPartnerAxisVisibility } from '../db/partnerAxisRead';
 import { withDevicePartnerPolicyVisibility } from './configPolicyOwnership';
@@ -1756,6 +1758,11 @@ export async function addFeatureLink(
     inlineSettings = configFeatureInlineSettingsSchema.parse(inlineSettings);
   }
 
+  if (featureType === 'helper' && inlineSettings && typeof inlineSettings === 'object') {
+    const settings = inlineSettings as Record<string, unknown>;
+    if (settings.branding !== undefined) settings.branding = helperBrandingSchema.parse(settings.branding);
+  }
+
   if (featureType === 'pam' && inlineSettings !== undefined && inlineSettings !== null) {
     pamInlineSettingsSchema.parse(inlineSettings);
   }
@@ -1794,6 +1801,10 @@ export async function addFeatureLink(
   if (normalizedAutomation) inlineSettings = normalizedAutomation.settings;
 
   const added = await executor.transaction(async (tx) => {
+    if (featureType === 'helper') {
+      await lockHelperBrandingPolicy(configPolicyId, tx);
+      await assertHelperBrandingWriteLevels(configPolicyId, inlineSettings, tx);
+    }
     const effectiveInlineSettings =
       featureType === 'patch'
         ? normalizePatchInlineSettings(inlineSettings)
@@ -1890,6 +1901,14 @@ export async function updateFeatureLink(
     if (!existing) return null;
     if (isRetiredConfigFeatureType(existing.featureType)) {
       throw new Error(`Feature link ${linkId} is retired (${existing.featureType}); it cannot be edited`);
+    }
+
+    if (existing.featureType === 'helper') await lockHelperBrandingPolicy(existing.configPolicyId, tx);
+
+    if (existing.featureType === 'helper' && updates.inlineSettings && typeof updates.inlineSettings === 'object') {
+      const settings = updates.inlineSettings as Record<string, unknown>;
+      if (settings.branding !== undefined) settings.branding = helperBrandingSchema.parse(settings.branding);
+      await assertHelperBrandingWriteLevels(existing.configPolicyId, settings, tx);
     }
 
     if (existing.featureType === 'pam' && updates.inlineSettings !== undefined && updates.inlineSettings !== null) {
@@ -2049,6 +2068,11 @@ export async function removeFeatureLink(linkId: string, configPolicyId: string) 
 async function removeFeatureLinkInTransaction(linkId: string, configPolicyId: string) {
   return db.transaction(async (tx) => {
     const predicate = and(eq(configPolicyFeatureLinks.id, linkId), eq(configPolicyFeatureLinks.configPolicyId, configPolicyId));
+    const [identity] = await tx.select({ featureType: configPolicyFeatureLinks.featureType }).from(configPolicyFeatureLinks).where(predicate).limit(1);
+    if (identity?.featureType === 'helper') {
+      await lockHelperBrandingPolicy(configPolicyId, tx);
+      await assertHelperBrandingRemoval(configPolicyId, tx);
+    }
     const [existing] = await tx.select().from(configPolicyFeatureLinks).where(predicate).for('update');
     if (!existing) return null;
 
@@ -2181,31 +2205,35 @@ export async function assignPolicy(
   osFilter?: string[],
   executor: DbExecutor = db
 ) {
-  // ON CONFLICT DO NOTHING instead of catch-and-map: callers run inside the
-  // withDbAccessContext transaction, and postgres.js re-throws a raised unique
-  // violation at commit time even after it's caught by the caller, turning a
-  // mapped 409 back into a raw 500 (see createCatalogItem in catalogService.ts).
-  // `config_assignments_unique` (config_policy_id, level, target_id) is the
-  // only non-PK unique constraint on this table, so a bare onConflictDoNothing
-  // only ever suppresses that duplicate-assignment case. Callers must treat a
-  // null return as "already assigned".
-  const [assignment] = await executor
-    .insert(configPolicyAssignments)
-    .values({
-      configPolicyId,
-      level,
-      targetId,
-      priority,
-      roleFilter: roleFilter?.length ? roleFilter : null,
-      osFilter: osFilter?.length ? osFilter : null,
-      assignedBy: userId,
-    })
-    .onConflictDoNothing()
-    .returning();
-  // A new assignment can take precedence over the one a device followed until
-  // now; alerts raised by rules the device no longer follows close.
-  if (assignment) scheduleComplianceAlertReconcile({ configPolicyId }, 'assignment-add');
-  return assignment ?? null;
+  return executor.transaction(async (tx) => {
+    await lockHelperBrandingPolicy(configPolicyId, tx);
+    await assertHelperBrandingAssignment(configPolicyId, level, tx);
+    // ON CONFLICT DO NOTHING instead of catch-and-map: callers run inside the
+    // withDbAccessContext transaction, and postgres.js re-throws a raised unique
+    // violation at commit time even after it's caught by the caller, turning a
+    // mapped 409 back into a raw 500 (see createCatalogItem in catalogService.ts).
+    // `config_assignments_unique` (config_policy_id, level, target_id) is the
+    // only non-PK unique constraint on this table, so a bare onConflictDoNothing
+    // only ever suppresses that duplicate-assignment case. Callers must treat a
+    // null return as "already assigned".
+    const [assignment] = await tx
+      .insert(configPolicyAssignments)
+      .values({
+        configPolicyId,
+        level,
+        targetId,
+        priority,
+        roleFilter: roleFilter?.length ? roleFilter : null,
+        osFilter: osFilter?.length ? osFilter : null,
+        assignedBy: userId,
+      })
+      .onConflictDoNothing()
+      .returning();
+    // A new assignment can take precedence over the one a device followed until
+    // now; alerts raised by rules the device no longer follows close.
+    if (assignment) scheduleComplianceAlertReconcile({ configPolicyId }, 'assignment-add');
+    return assignment ?? null;
+  });
 }
 
 export async function validateAssignmentTarget(

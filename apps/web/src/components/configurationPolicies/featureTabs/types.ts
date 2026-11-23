@@ -1,3 +1,4 @@
+import type { HelperBrandingPreview } from "./HelperBrandingFields";
 import type { ConfigFeatureType } from '@breeze/shared';
 import { i18n } from '@/lib/i18n';
 
@@ -45,6 +46,7 @@ export type ParentPolicySummary = {
 };
 
 export type FeatureTabProps = {
+  helperBrandingPreview?: HelperBrandingPreview;
   policyId: string;
   existingLink: FeatureLink | undefined;
   /** Own-or-parent links for advisory duplicate detection; monitors additionally include inheritedMonitorsLink. */

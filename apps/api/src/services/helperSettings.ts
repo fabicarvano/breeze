@@ -3,10 +3,13 @@
  * by the agent heartbeat (helperEnabled/helperSettings), helperAuth (a Helper
  * disabled by policy stops authenticating) and GET /helper/config.
  *
- * Precedence: the winning `helper` configuration-policy feature link; only
- * when NO link matches does the legacy organizations.settings.helper.enabled
- * flag apply; otherwise defaults (enabled: false).
+ * Operational precedence: the winning `helper` feature link, then defaults.
+ * No match (or a legacy null settings winner) uses the legacy org enabled flag.
+ * Branding has its own partner → organization field merge and opaque tenant
+ * scope; a device/site/group operational winner never hides that branding.
  */
+import { createHash } from 'node:crypto';
+import { readHelperBranding, type EffectiveHelperBranding, type HelperBrandingValues } from '@breeze/shared/validators/helperBranding';
 import { hierarchyFor, type DeviceHierarchyOpts } from './deviceHierarchy';
 import { and, eq, inArray, or } from 'drizzle-orm';
 import { db } from '../db';
@@ -48,6 +51,7 @@ export async function getOrgHelperSettings(orgId: string): Promise<{ enabled: bo
 
 export interface HelperSettings {
   enabled: boolean;
+  branding?: EffectiveHelperBranding;
   /**
    * Whether Breeze Assist draws its system-tray icon. Independent of
    * `enabled` — the helper still serves chat, remote-access consent and PAM
@@ -80,8 +84,10 @@ const HELPER_DEFAULTS: HelperSettings = {
 // Resolves the helper feature settings for a device from configuration
 // policies. Returns null when NO helper feature link matched — callers
 // distinguish "no policy" (legacy org fallback applies) from an explicit
-// enabled:false (which must win; see buildHelperConfigUpdate).
-export async function resolveDeviceHelperSettings(deviceId: string, opts?: DeviceHierarchyOpts): Promise<HelperSettings | null> {
+// enabled:false (which must win; see buildHelperConfigUpdate). A legacy link
+// with null inlineSettings keeps the org enabled fallback but returns an
+// object so independently resolved branding can still reach the device.
+export async function resolveDeviceHelperSettings(deviceId: string, opts?: HelperConfigUpdateOptions): Promise<HelperSettings | null> {
   // #8053 W1a-1: the heartbeat passes the hierarchy it already loaded; every
   // other caller gets the three reads below, unchanged.
   const passed = hierarchyFor(deviceId, opts);
@@ -160,11 +166,16 @@ export async function resolveDeviceHelperSettings(deviceId: string, opts?: Devic
   });
 
   const winner = rows[0];
-  if (!winner?.inlineSettings) return null;
+  if (!winner) return null;
 
-  const s = winner.inlineSettings as Record<string, unknown>;
+  const s = isObject(winner.inlineSettings) ? winner.inlineSettings : {};
+  // Preserve the existing null-inlineSettings legacy fallback while resolving
+  // branding independently of that operational winner.
+  const nullWinnerEnabled = !winner.inlineSettings ? (await (opts?.loadOrgHelperSettings ?? getOrgHelperSettings)(device.orgId)).enabled : undefined;
+  const branding = resolveHelperBrandingRows(rows, device.orgId, org?.partnerId ?? null);
   return {
-    enabled: typeof s.enabled === 'boolean' ? s.enabled : HELPER_DEFAULTS.enabled,
+    branding,
+    enabled: typeof s.enabled === 'boolean' ? s.enabled : nullWinnerEnabled ?? HELPER_DEFAULTS.enabled,
     showTrayIcon: typeof s.showTrayIcon === 'boolean' ? s.showTrayIcon : HELPER_DEFAULTS.showTrayIcon,
     showOpenPortal: typeof s.showOpenPortal === 'boolean' ? s.showOpenPortal : HELPER_DEFAULTS.showOpenPortal,
     showDeviceInfo: typeof s.showDeviceInfo === 'boolean' ? s.showDeviceInfo : HELPER_DEFAULTS.showDeviceInfo,
@@ -174,6 +185,23 @@ export async function resolveDeviceHelperSettings(deviceId: string, opts?: Devic
       ? s.lifecycleMode
       : undefined,
   };
+}
+
+export function helperBrandingScope(orgId: string, partnerId: string | null): string {
+  return createHash('sha256').update(JSON.stringify(['helper-branding-v1', partnerId, orgId])).digest('hex');
+}
+/** Rows are already sorted using the unchanged operational assignment order. */
+export function resolveHelperBrandingRows(
+  rows: ReadonlyArray<{ level: string; inlineSettings: unknown }>, orgId: string, partnerId: string | null,
+): EffectiveHelperBranding {
+  const values: HelperBrandingValues = {};
+  for (const level of ['partner', 'organization']) {
+    const winner = rows.find(row => row.level === level);
+    const settings = isObject(winner?.inlineSettings) ? winner.inlineSettings : {};
+    Object.assign(values, readHelperBranding(settings.branding));
+  }
+  const scopeId = helperBrandingScope(orgId, partnerId);
+  return Object.keys(values).length ? { state: 'set', scopeId, values } : { state: 'cleared', scopeId };
 }
 
 const HELPER_CACHE_TTL_SECONDS = 120;
@@ -197,12 +225,20 @@ function helperCacheKey(deviceId: string): string {
 }
 
 /** The device's cached helper settings, or null on a miss or a Redis error. */
-export async function readCachedHelperSettings(deviceId: string): Promise<HelperSettings | null> {
+export async function readCachedHelperSettings(deviceId: string, opts?: DeviceHierarchyOpts): Promise<HelperSettings | null> {
   const redis = getRedis();
   if (!redis) return null;
   try {
     const cached = await redis.get(helperCacheKey(deviceId));
-    return cached ? JSON.parse(cached) as HelperSettings : null;
+    if (!cached) return null;
+    const settings = JSON.parse(cached) as HelperSettings;
+    // A pre-upgrade cache entry has no explicit branding state; refresh it.
+    if (!settings.branding) return null;
+    const passed = hierarchyFor(deviceId, opts);
+    const [scope] = passed ? [{ orgId: passed.orgId, partnerId: passed.org?.partnerId ?? null }]
+      : await db.select({ orgId: devices.orgId, partnerId: organizations.partnerId }).from(devices)
+        .innerJoin(organizations, eq(organizations.id, devices.orgId)).where(eq(devices.id, deviceId)).limit(1);
+    return scope && settings.branding.scopeId === helperBrandingScope(scope.orgId, scope.partnerId) ? settings : null;
   } catch (cacheErr) {
     console.warn(`[helper] Redis cache read failed for device ${deviceId}:`, cacheErr);
     return null;
@@ -219,7 +255,7 @@ export async function buildHelperConfigUpdate(
   // hit; this covers direct callers of buildHelperConfigUpdate.
   hierarchyFor(deviceId, opts);
   if (!opts?.skipCacheRead) {
-    const cached = await readCachedHelperSettings(deviceId);
+    const cached = await readCachedHelperSettings(deviceId, opts);
     if (cached) return cached;
   }
 
@@ -238,7 +274,12 @@ export async function buildHelperConfigUpdate(
   if (settings === null) {
     const loadOrg = opts?.loadOrgHelperSettings ?? getOrgHelperSettings;
     const orgEnabled = (await loadOrg(orgId)).enabled;
-    settings = { ...HELPER_DEFAULTS, enabled: orgEnabled };
+    // No matching policy still sends an explicit cleared block. The partner axis
+    // is part of its opaque scope, so a moved device cannot retain another brand.
+    const passed = hierarchyFor(deviceId, opts);
+    const [org] = passed ? [{ partnerId: passed.org?.partnerId ?? null }]
+      : await db.select({ partnerId: organizations.partnerId }).from(organizations).where(eq(organizations.id, orgId)).limit(1);
+    settings = { ...HELPER_DEFAULTS, enabled: orgEnabled, branding: resolveHelperBrandingRows([], orgId, org?.partnerId ?? null) };
   }
 
   const redis = getRedis();

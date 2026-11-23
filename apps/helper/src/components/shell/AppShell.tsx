@@ -1,3 +1,5 @@
+import { useBranding } from '../../lib/branding';
+import { t, useI18n, getHelperLocale } from '../../lib/i18n';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
@@ -40,13 +42,13 @@ function formatDate(dateStr: string): string {
   const now = new Date();
   const diffMs = now.getTime() - d.getTime();
   const diffMins = Math.floor(diffMs / 60000);
-  if (diffMins < 1) return 'Just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffMins < 1) return t('Just now');
+  if (diffMins < 60) return t('{count}m ago', { count: diffMins });
   const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffHours < 24) return t('{count}h ago', { count: diffHours });
   const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return d.toLocaleDateString();
+  if (diffDays < 7) return t('{count}d ago', { count: diffDays });
+  return d.toLocaleDateString(getHelperLocale());
 }
 
 function SessionHistory({
@@ -56,6 +58,7 @@ function SessionHistory({
   onClose: () => void;
   onSelectSession: () => void;
 }) {
+  useI18n();
   const { sessions, sessionsLoading, loadSession, loadSessions } = useChatStore();
 
   useEffect(() => {
@@ -72,21 +75,21 @@ function SessionHistory({
       {/* No drag region / traffic-light spacer: this bar lives inside the shell's
           main region, whose header above owns the traffic lights and dragging. */}
       <div className="helper-history-header">
-        <span className="helper-history-title">History</span>
+        <span className="helper-history-title">{t('History')}</span>
         <div className="helper-header-drag-spacer" />
         <button onClick={onClose} className="helper-btn helper-btn-sm">
-          Back
+          {t('Back')}
         </button>
       </div>
       <div className="helper-history-list">
         {sessionsLoading && (
           <div className="helper-history-loading">
             <span className="helper-spinner" />
-            <span>Loading...</span>
+            <span>{t('Loading...')}</span>
           </div>
         )}
         {!sessionsLoading && sessions.length === 0 && (
-          <div className="helper-history-empty">No conversations yet</div>
+          <div className="helper-history-empty">{t('No conversations yet')}</div>
         )}
         {sessions.map((s) => (
           <button
@@ -95,11 +98,11 @@ function SessionHistory({
             onClick={() => handleSelect(s)}
           >
             <span className="helper-history-item-title">
-              {s.title || 'Untitled'}
+              {s.title || t('Untitled')}
             </span>
             <span className="helper-history-item-meta">
               {formatDate(s.updatedAt)}
-              {s.turnCount > 0 && ` · ${s.turnCount} turns`}
+              {s.turnCount > 0 && t(' · {count} turns', { count: s.turnCount })}
             </span>
           </button>
         ))}
@@ -121,7 +124,7 @@ function filterInput(input: Record<string, unknown>): Record<string, unknown> {
 }
 
 function formatIdle(minutes: number): string {
-  if (minutes < 1) return 'just now';
+  if (minutes < 1) return t('just now');
   if (minutes < 60) return `${minutes}m`;
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h`;
@@ -140,6 +143,7 @@ function formatDeviceIdle(lastSeenAt: string | undefined): string | null {
 }
 
 function DeviceBadge({ ctx }: { ctx: DeviceContext }) {
+  useI18n();
   const name = ctx.displayName || ctx.hostname;
   const isOnline = ctx.status === 'online';
   const deviceIdleText = !isOnline ? formatDeviceIdle(ctx.lastSeenAt) : null;
@@ -151,14 +155,14 @@ function DeviceBadge({ ctx }: { ctx: DeviceContext }) {
         <span className="helper-approval-device-name">{name}</span>
         <span className="helper-approval-device-sep">&middot;</span>
         <span className={isOnline ? 'helper-approval-device-active' : 'helper-approval-device-idle'}>
-          {isOnline ? 'online' : (deviceIdleText ? `offline ${deviceIdleText}` : 'offline')}
+          {isOnline ? t('online') : (deviceIdleText ? t('offline {duration}', { duration: deviceIdleText }) : t('offline'))}
         </span>
       </div>
       {sessions.map((s, i) => {
         const state = s.activityState ?? 'unknown';
         const idleText = state !== 'active' && s.idleMinutes != null && s.idleMinutes > 0
-          ? `idle ${formatIdle(s.idleMinutes)}`
-          : state;
+          ? t('idle {duration}', { duration: formatIdle(s.idleMinutes) })
+          : t(state);
         return (
           <div key={i} className="helper-approval-device-session">
             <span className="helper-approval-device-user">{s.username}</span>
@@ -182,11 +186,12 @@ function DeviceBadge({ ctx }: { ctx: DeviceContext }) {
  * says to use the web or mobile approval surface for those.
  */
 function ScriptProposalSummary({ proposal }: { proposal: PendingApprovalScriptProposal }) {
+  useI18n();
   return (
     <div className="helper-proposal" data-testid="helper-proposal">
       <div className="helper-proposal-head">
         <span className="helper-proposal-risk" data-testid="helper-proposal-risk" data-tier={proposal.riskTier}>
-          {proposal.riskTier}
+          {t(proposal.riskTier)}
         </span>
         <span className="helper-proposal-summary" data-testid="helper-proposal-summary">{proposal.summary}</span>
       </div>
@@ -201,7 +206,7 @@ function ScriptProposalSummary({ proposal }: { proposal: PendingApprovalScriptPr
       {proposal.strictHits.length > 0 && (
         <div className="helper-proposal-strict">
           <div className="helper-proposal-strict-note" data-testid="helper-proposal-strict-note">
-            Dangerous patterns must be acknowledged from the Breeze web or mobile approval — this window cannot acknowledge them.
+            {t('Dangerous patterns must be acknowledged from the Breeze web or mobile approval — this window cannot acknowledge them.')}
           </div>
           <ul>
             {proposal.strictHits.map((hit, i) => (
@@ -211,7 +216,7 @@ function ScriptProposalSummary({ proposal }: { proposal: PendingApprovalScriptPr
         </div>
       )}
       <details className="helper-approval-details" data-testid="helper-proposal-body">
-        <summary data-testid="helper-proposal-body-toggle">Show script</summary>
+        <summary data-testid="helper-proposal-body-toggle">{t('Show script')}</summary>
         <pre className="helper-approval-input">{proposal.content}</pre>
       </details>
     </div>
@@ -227,6 +232,7 @@ export function ToolApprovalPopup({
   onApprove: () => void;
   onDeny: () => void;
 }) {
+  useI18n();
   const [remainingMs, setRemainingMs] = useState(AUTO_DENY_MS);
 
   useEffect(() => {
@@ -256,7 +262,7 @@ export function ToolApprovalPopup({
       <div className="helper-approval-card">
         <div className="helper-approval-header">
           <span className="helper-approval-icon">&#9888;</span>
-          <span className="helper-approval-title">Approval Required</span>
+          <span className="helper-approval-title">{t('Approval Required')}</span>
         </div>
         <div className="helper-approval-body">
           <div className="helper-approval-desc">{approval.description}</div>
@@ -268,7 +274,7 @@ export function ToolApprovalPopup({
             <ScriptProposalSummary proposal={approval.scriptProposal} />
           ) : hasVisibleInput && (
             <details className="helper-approval-details">
-              <summary>Show parameters</summary>
+              <summary>{t('Show parameters')}</summary>
               <pre className="helper-approval-input">
                 {JSON.stringify(visibleInput, null, 2)}
               </pre>
@@ -276,13 +282,13 @@ export function ToolApprovalPopup({
           )}
         </div>
         <div className="helper-approval-footer">
-          <span className="helper-approval-countdown">Auto-deny {countdown}</span>
+          <span className="helper-approval-countdown">{t('Auto-deny {countdown}', { countdown })}</span>
           <div className="helper-approval-actions">
             <button onClick={onDeny} className="helper-btn helper-btn-deny">
-              Deny
+              {t('Deny')}
             </button>
             <button onClick={onApprove} className="helper-btn helper-btn-allow">
-              Allow
+              {t('Allow')}
             </button>
           </div>
         </div>
@@ -301,6 +307,7 @@ type DeviceInfo = {
 };
 
 function DeviceInfoView({ onClose }: { onClose: () => void }) {
+  useI18n();
   const [device, setDevice] = useState<DeviceInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -330,10 +337,10 @@ function DeviceInfoView({ onClose }: { onClose: () => void }) {
             agentVersion: data.agentVersion,
           });
         } else {
-          setError('Failed to load device info');
+          setError(t('Failed to load device info'));
         }
       })
-      .catch((e: Error) => setError(e.message || 'Failed to load device info'))
+      .catch((e: Error) => setError(e.message || t('Failed to load device info')))
       .finally(() => setLoading(false));
   }, [agentConfig]);
 
@@ -342,49 +349,49 @@ function DeviceInfoView({ onClose }: { onClose: () => void }) {
       {/* No drag region / traffic-light spacer: this bar lives inside the shell's
           main region, whose header above owns the traffic lights and dragging. */}
       <div className="helper-history-header">
-        <span className="helper-history-title">Device Info</span>
+        <span className="helper-history-title">{t('Device Info')}</span>
         <div className="helper-header-drag-spacer" />
-        <button onClick={onClose} className="helper-btn helper-btn-sm">Back</button>
+        <button onClick={onClose} className="helper-btn helper-btn-sm">{t('Back')}</button>
       </div>
       <div className="helper-messages" style={{ padding: '16px' }}>
         {loading && (
           <div className="helper-history-loading">
             <span className="helper-spinner" />
-            <span>Loading...</span>
+            <span>{t('Loading...')}</span>
           </div>
         )}
         {error && <div className="helper-error-banner"><span>{error}</span></div>}
         {device && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div style={{ padding: '12px', border: '1px solid var(--helper-border, #e5e7eb)', borderRadius: '8px' }}>
-              <div style={{ fontSize: '13px', color: 'var(--helper-muted, #6b7280)' }}>Hostname</div>
+              <div style={{ fontSize: '13px', color: 'var(--helper-muted, #6b7280)' }}>{t('Hostname')}</div>
               <div style={{ fontSize: '15px', fontWeight: 600 }}>{device.hostname}</div>
             </div>
             <div style={{ padding: '12px', border: '1px solid var(--helper-border, #e5e7eb)', borderRadius: '8px' }}>
-              <div style={{ fontSize: '13px', color: 'var(--helper-muted, #6b7280)' }}>Operating System</div>
+              <div style={{ fontSize: '13px', color: 'var(--helper-muted, #6b7280)' }}>{t('Operating System')}</div>
               <div style={{ fontSize: '15px', fontWeight: 600 }}>{device.osType} {device.osVersion}</div>
             </div>
             <div style={{ padding: '12px', border: '1px solid var(--helper-border, #e5e7eb)', borderRadius: '8px' }}>
-              <div style={{ fontSize: '13px', color: 'var(--helper-muted, #6b7280)' }}>Status</div>
+              <div style={{ fontSize: '13px', color: 'var(--helper-muted, #6b7280)' }}>{t('Status')}</div>
               <div style={{ fontSize: '15px', fontWeight: 600, color: device.status === 'online' ? '#22c55e' : '#ef4444' }}>
-                {device.status}
+                {t(device.status)}
               </div>
             </div>
             {device.lastSeenAt && (
               <div style={{ padding: '12px', border: '1px solid var(--helper-border, #e5e7eb)', borderRadius: '8px' }}>
-                <div style={{ fontSize: '13px', color: 'var(--helper-muted, #6b7280)' }}>Last Check-in</div>
+                <div style={{ fontSize: '13px', color: 'var(--helper-muted, #6b7280)' }}>{t('Last Check-in')}</div>
                 <div style={{ fontSize: '15px', fontWeight: 600 }}>{formatDate(device.lastSeenAt)}</div>
               </div>
             )}
             {device.agentVersion && (
               <div style={{ padding: '12px', border: '1px solid var(--helper-border, #e5e7eb)', borderRadius: '8px' }}>
-                <div style={{ fontSize: '13px', color: 'var(--helper-muted, #6b7280)' }}>Agent Version</div>
+                <div style={{ fontSize: '13px', color: 'var(--helper-muted, #6b7280)' }}>{t('Agent Version')}</div>
                 <div style={{ fontSize: '15px', fontWeight: 600 }}>{device.agentVersion}</div>
               </div>
             )}
             {helperVersion && (
               <div style={{ padding: '12px', border: '1px solid var(--helper-border, #e5e7eb)', borderRadius: '8px' }}>
-                <div style={{ fontSize: '13px', color: 'var(--helper-muted, #6b7280)' }}>Helper Version</div>
+                <div style={{ fontSize: '13px', color: 'var(--helper-muted, #6b7280)' }}>{t('Helper Version')}</div>
                 <div style={{ fontSize: '15px', fontWeight: 600 }}>{helperVersion}</div>
               </div>
             )}
@@ -401,6 +408,8 @@ function DeviceInfoView({ onClose }: { onClose: () => void }) {
 // `mainView`. Connection gates and the username prompt stay full-screen ABOVE
 // this in App; by the time the shell mounts we are always connected + named.
 export default function AppShell() {
+  useI18n();
+  const branding = useBranding((s) => s.values);
   const {
     sessionId,
     error,
@@ -475,7 +484,7 @@ export default function AppShell() {
     }
   };
 
-  // Tray menu "Device Info" click. Tray events only exist inside Tauri; the
+  // Tray menu t('Device Info') click. Tray events only exist inside Tauri; the
   // direct listen() call throws in browser dev mode, so skip it when the Tauri
   // IPC bridge is absent.
   useEffect(() => {
@@ -488,9 +497,9 @@ export default function AppShell() {
   }, []);
 
   const navOptions = [
-    ...(workspaceAvailable === true ? [{ key: 'files', label: 'Files' }] : []),
-    { key: 'chat', label: 'Chat' },
-    { key: 'history', label: 'History' },
+    ...(workspaceAvailable === true ? [{ key: 'files', label: t('Files') }] : []),
+    { key: 'chat', label: t('Chat') },
+    { key: 'history', label: t('History') },
   ];
 
   // The chat toggle only makes sense from Files (the one primary view that can
@@ -509,7 +518,8 @@ export default function AppShell() {
         <div className="helper-header-left" data-tauri-drag-region>
           {isMacOS && <div className="helper-traffic-light-spacer" />}
           <span className="helper-status-dot helper-status-connected" />
-          <span className="helper-title">Breeze Helper</span>
+          <span className="helper-title" title={branding.companyName}>{branding.displayName ?? 'Breeze Helper'}</span>
+          {branding.companyName && <span className="helper-brand-company">{branding.companyName}</span>}
         </div>
         <div className="helper-shell-nav">
           <SegmentedControl
@@ -526,28 +536,28 @@ export default function AppShell() {
               className="helper-btn helper-btn-sm helper-chat-toggle"
               data-testid="chat-toggle"
               aria-pressed={panelOpen}
-              title={panelOpen ? 'Hide chat' : 'Show chat'}
+              title={panelOpen ? t('Hide chat') : t('Show chat')}
             >
-              Chat
+              {t('Chat')}
             </button>
           )}
           {chatScoped && sessionId && (
             <button
               onClick={() => flagSession('User flagged from helper')}
               className={`helper-btn helper-btn-sm${isFlagged ? ' helper-btn-flagged' : ''}`}
-              title={isFlagged ? 'Conversation flagged' : 'Flag conversation for review'}
+              title={isFlagged ? t('Conversation flagged') : t('Flag conversation for review')}
               disabled={isFlagged}
             >
-              {isFlagged ? 'Flagged' : 'Flag'}
+              {isFlagged ? t('Flagged') : t('Flag')}
             </button>
           )}
           {chatScoped && (
             <button
               onClick={clearMessages}
               className="helper-btn helper-btn-sm"
-              title="New conversation"
+              title={t('New conversation')}
             >
-              New
+              {t('New')}
             </button>
           )}
           {!isMacOS && (
@@ -555,14 +565,14 @@ export default function AppShell() {
               <button
                 onClick={() => invoke('minimize_window').catch(() => {})}
                 className="helper-btn-window"
-                title="Minimize"
+                title={t('Minimize')}
               >
                 &#8211;
               </button>
               <button
                 onClick={() => invoke('hide_window').catch(() => {})}
                 className="helper-btn-window helper-btn-window-close"
-                title="Close to tray"
+                title={t('Close to tray')}
               >
                 &#10005;
               </button>
@@ -586,6 +596,7 @@ export default function AppShell() {
                 <button
                   onClick={() => useChatStore.setState({ error: null })}
                   className="helper-btn-close"
+                  aria-label={t('Dismiss error')}
                 >
                   ×
                 </button>

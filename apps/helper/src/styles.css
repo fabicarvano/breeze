@@ -427,6 +427,8 @@ body {
 .helper-empty p {
   margin: 0;
   font-size: 13px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .helper-empty p:first-child {
@@ -939,6 +941,8 @@ body {
   font-size: 16px;
   font-weight: 600;
   color: var(--text-primary);
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .helper-username-subtitle {
@@ -2298,4 +2302,19 @@ body {
   padding: 6px 8px;
   font-size: var(--ws-text-12);
   color: var(--ws-text-tertiary);
+}
+
+/* Runtime colours only affect paired surfaces; theme text/link colours stay readable. */
+.helper-header {
+  background: var(--helper-brand-primary, var(--ws-canvas));
+  color: var(--helper-brand-primary-contrast, var(--ws-ink));
+}
+.helper-header .helper-title { color: inherit; }
+.helper-header .helper-btn-window { color: var(--helper-brand-primary-contrast, var(--text-secondary)); }
+.helper-header .helper-btn-window:hover { background: var(--helper-brand-primary, var(--bg-hover)); color: var(--helper-brand-primary-contrast, var(--text-primary)); }
+.helper-header .helper-btn-window-close:hover { background: #c42b1c; color: #fff; }
+.helper-brand-company { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 120px; }
+.helper-btn.helper-btn-send, .bg-ws-accent {
+  background-color: var(--helper-brand-accent, var(--ws-accent));
+  color: var(--helper-brand-accent-contrast, var(--ws-accent-contrast));
 }

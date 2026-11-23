@@ -1,3 +1,4 @@
+import { t, useI18n } from '../../lib/i18n';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import type { FinderFile, WorkspaceFilters, WorkspaceSource } from '../../stores/workspaceStore';
 
@@ -36,8 +37,8 @@ function distinctValues(rows: FinderFile[], pick: (f: FinderFile) => string | nu
 
 function dateChipLabel(filters: WorkspaceFilters): string | null {
   if (filters.dateFrom && filters.dateTo) return `${filters.dateFrom} – ${filters.dateTo}`;
-  if (filters.dateFrom) return `Since ${filters.dateFrom}`;
-  if (filters.dateTo) return `Until ${filters.dateTo}`;
+  if (filters.dateFrom) return t('Since {date}', { date: filters.dateFrom });
+  if (filters.dateTo) return t('Until {date}', { date: filters.dateTo });
   return null;
 }
 
@@ -61,6 +62,7 @@ export interface FilterChipsProps {
 export function FilterChips({
   rows, sources, filters, onSetFilter, onClearFilter, chips = ALL_CHIPS,
 }: FilterChipsProps) {
+  const t = useI18n();
   const enabled = new Set(chips);
   function chip(
     key: ChipKey,
@@ -76,13 +78,13 @@ export function FilterChips({
             type="button"
             className={`ws-filter-chip${active ? ' ws-filter-chip-active' : ''}`}
           >
-            <span>{active ? `${CHIP_LABELS[key]}: ${activeLabel}` : CHIP_LABELS[key]}</span>
+            <span>{active ? `${t(CHIP_LABELS[key])}: ${activeLabel}` : t(CHIP_LABELS[key])}</span>
             {active && (
               <span
                 className="ws-filter-chip-close"
                 role="button"
                 tabIndex={0}
-                aria-label={`Clear ${CHIP_LABELS[key]} filter`}
+                aria-label={t('Clear {filter} filter', { filter: t(CHIP_LABELS[key]) })}
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -112,7 +114,7 @@ export function FilterChips({
 
   function optionList(values: string[], onPick: (v: string) => void) {
     if (values.length === 0) {
-      return <div className="ws-filter-chip-menu-empty">No values in the current results</div>;
+      return <div className="ws-filter-chip-menu-empty">{t("No values in the current results")}</div>;
     }
     return values.map((v) => (
       <DropdownMenu.Item key={v} className="ws-filter-chip-menu-item" onSelect={() => onPick(v)}>
@@ -156,7 +158,7 @@ export function FilterChips({
                 onClearFilter('dateTo');
               }}
             >
-              {preset.label}
+              {t(preset.label)}
             </DropdownMenu.Item>
           ))}
           <div
@@ -173,7 +175,7 @@ export function FilterChips({
             }}
           >
             <label>
-              From
+              {t("From")}
               <input
                 type="date"
                 value={filters.dateFrom?.slice(0, 10) ?? ''}
@@ -181,7 +183,7 @@ export function FilterChips({
               />
             </label>
             <label>
-              To
+              {t("To")}
               <input
                 type="date"
                 value={filters.dateTo?.slice(0, 10) ?? ''}

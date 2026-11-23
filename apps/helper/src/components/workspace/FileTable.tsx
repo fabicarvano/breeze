@@ -1,3 +1,4 @@
+import { t, useI18n, getHelperLocale } from '../../lib/i18n';
 import { useEffect, useRef, type ReactNode } from 'react';
 import {
   useWorkspaceStore, sortRows,
@@ -31,7 +32,7 @@ function formatModified(mtime: string | null): string {
   if (!mtime) return '';
   const d = new Date(mtime);
   if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return d.toLocaleDateString(getHelperLocale(), { month: 'short', day: 'numeric' });
 }
 
 export interface FileTableProps {
@@ -68,20 +69,21 @@ function rowMenuItems(
   { onOpen, onCopy, onReveal }: Pick<FileTableProps, 'onOpen' | 'onCopy' | 'onReveal'>,
 ): MenuItem[] {
   if (file.isDir) {
-    return [{ label: 'Open', onSelect: () => onOpen(file) }];
+    return [{ label: t('Open'), onSelect: () => onOpen(file) }];
   }
   const items: MenuItem[] = [
-    { label: 'Open', onSelect: () => onOpen(file), disabled: !file.openPath },
-    { label: 'Copy path', onSelect: () => onCopy(file) },
+    { label: t('Open'), onSelect: () => onOpen(file), disabled: !file.openPath },
+    { label: t('Copy path'), onSelect: () => onCopy(file) },
   ];
   if (onReveal) {
-    items.push({ label: 'Reveal in Browse', onSelect: () => onReveal(file) });
+    items.push({ label: t('Reveal in Browse'), onSelect: () => onReveal(file) });
   }
   return items;
 }
 
 /** Sortable list-table for the search/browse/recents file views. */
 export function FileTable(props: FileTableProps) {
+  const t = useI18n();
   const { view, rows, onOpen, onCopy, onReveal, renderMeta, sources } = props;
   const sort = useWorkspaceStore((s) => s.sort[view]);
   const setSort = useWorkspaceStore((s) => s.setSort);
@@ -125,7 +127,7 @@ export function FileTable(props: FileTableProps) {
             onClick={() => setSort(view, col.key)}
             aria-sort={sort?.col === col.key ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
           >
-            <span>{col.label}</span>
+            <span>{t(col.label)}</span>
             {sort?.col === col.key && (
               <span className="ws-file-table-chevron">{sort.dir === 'asc' ? '▲' : '▼'}</span>
             )}

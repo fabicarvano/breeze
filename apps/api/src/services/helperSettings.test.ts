@@ -44,7 +44,7 @@ vi.mock('./configPolicyOwnership', () => ({
 const redis = { get: vi.fn(), set: vi.fn() };
 vi.mock('./redis', () => ({ getRedis: vi.fn(() => redis) }));
 
-import { buildHelperConfigUpdate } from './helperSettings';
+import { buildHelperConfigUpdate, resolveDeviceHelperSettings, helperBrandingScope, readCachedHelperSettings } from './helperSettings';
 
 /** No helper policy link matches, so the legacy org flag decides. */
 function queueNoPolicyMatch() {
@@ -66,7 +66,7 @@ describe('buildHelperConfigUpdate', () => {
 
   it('uses the org flag when no policy matches, and caches the result', async () => {
     queueNoPolicyMatch();
-    queue.push({ rows: [{ settings: { helper: { enabled: true } } }] });
+    queue.push({ rows: [{ settings: { helper: { enabled: true } } }] }, { rows: [{ partnerId: 'partner-1' }] });
 
     const settings = await buildHelperConfigUpdate('dev-1', 'org-1');
 
@@ -95,5 +95,44 @@ describe('buildHelperConfigUpdate', () => {
 
     await expect(buildHelperConfigUpdate('dev-1', 'org-1')).rejects.toThrow('connection terminated');
     expect(redis.set).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('Helper branding resolution and tenancy', () => {
+  beforeEach(() => { vi.clearAllMocks(); queue.length = 0; redis.get.mockResolvedValue(null); });
+  it('keeps device operational winner while merging one winner per branding level', async () => {
+    queue.push({ rows: [{ orgId: 'org-1', siteId: 'site-1' }] }, { rows: [{ partnerId: 'partner-1' }] }, { rows: [] }, { rows: [
+      { level: 'partner', assignmentPriority: 0, inlineSettings: { branding: { displayName: 'Partner', companyName: 'MSP' } } },
+      { level: 'partner', assignmentPriority: 5, inlineSettings: { branding: { portalLabel: 'Must not merge second winner' } } },
+      { level: 'organization', assignmentPriority: 0, inlineSettings: { branding: { welcomeTitle: 'Customer' } } },
+      { level: 'device', assignmentPriority: 0, inlineSettings: { enabled: true, showTrayIcon: false, branding: { displayName: 'Forbidden' } } },
+    ] });
+    const result = await resolveDeviceHelperSettings('dev-1');
+    expect(result).toMatchObject({ enabled: true, showTrayIcon: false, branding: { state: 'set', values: { displayName: 'Partner', companyName: 'MSP', welcomeTitle: 'Customer' } } });
+    expect(result?.branding?.values?.portalLabel).toBeUndefined();
+  });
+  it('separates organization and partner scopes', () => {
+    expect(helperBrandingScope('org-1', 'partner-1')).not.toBe(helperBrandingScope('org-2', 'partner-1'));
+    expect(helperBrandingScope('org-1', 'partner-1')).not.toBe(helperBrandingScope('org-1', 'partner-2'));
+    expect(helperBrandingScope('org-1', 'partner-1')).not.toContain('org-1');
+  });
+  it('does not serve another tenant branding from a device cache after a move', async () => {
+    redis.get.mockResolvedValue(JSON.stringify({ enabled: true, branding: { state: 'set', scopeId: helperBrandingScope('old-org', 'old-partner'), values: { displayName: 'Old' } } }));
+    queue.push({ rows: [{ orgId: 'new-org', partnerId: 'new-partner' }] });
+    expect(await readCachedHelperSettings('dev-1')).toBeNull();
+  });
+  it('explicitly clears removed branding while retaining operational defaults', async () => {
+    queue.push({ rows: [{ orgId: 'org-1', siteId: 'site-1' }] }, { rows: [{ partnerId: 'partner-1' }] }, { rows: [] },
+      { rows: [{ level: 'partner', assignmentPriority: 0, inlineSettings: { enabled: true } }] });
+    expect(await resolveDeviceHelperSettings('dev-1')).toMatchObject({ enabled: true, branding: { state: 'cleared', scopeId: helperBrandingScope('org-1', 'partner-1') } });
+  });
+  it('preserves legacy enabled for a null operational winner without hiding partner branding', async () => {
+    queue.push({ rows: [{ orgId: 'org-1', siteId: 'site-1' }] }, { rows: [{ partnerId: 'partner-1' }] }, { rows: [] },
+      { rows: [{ level: 'device', assignmentPriority: 0, inlineSettings: null },
+        { level: 'partner', assignmentPriority: 0, inlineSettings: { branding: { displayName: 'Partner' } } }] });
+    const loadOrgHelperSettings = vi.fn().mockResolvedValue({ enabled: true });
+    expect(await resolveDeviceHelperSettings('dev-1', { loadOrgHelperSettings })).toMatchObject({ enabled: true, branding: { state: 'set', values: { displayName: 'Partner' } } });
+    expect(loadOrgHelperSettings).toHaveBeenCalledWith('org-1');
   });
 });

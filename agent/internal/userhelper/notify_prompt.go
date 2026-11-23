@@ -19,6 +19,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/breeze-rmm/agent/internal/i18n"
 	"github.com/breeze-rmm/agent/internal/ipc"
 )
 
@@ -85,9 +86,9 @@ func notifyPromptLegend(actions []string) string {
 	no := notifyPromptAction(actions, 1)
 	switch {
 	case yes != "" && no != "":
-		return "Select Yes to " + strings.ToLower(yes) + ", or No to " + strings.ToLower(no) + "."
+		return i18n.Format("Select Yes to %s, or No to %s.", strings.ToLower(yes), strings.ToLower(no))
 	case yes != "":
-		return "Select Yes to " + strings.ToLower(yes) + "."
+		return i18n.Format("Select Yes to %s.", strings.ToLower(yes))
 	default:
 		return ""
 	}
@@ -152,5 +153,17 @@ func showNotifyPrompt(req ipc.NotifyRequest) (clicked string, shown bool) {
 		return "", false
 	}
 	defer notifyPromptMu.Unlock()
-	return showNotifyPromptFn(req)
+	display := req
+	display.Actions = append([]string(nil), req.Actions...)
+	for i, action := range display.Actions {
+		display.Actions[i] = i18n.ActionLabel(action)
+	}
+
+	clicked, shown = showNotifyPromptFn(display)
+	for i, label := range display.Actions {
+		if clicked == label {
+			return req.Actions[i], shown
+		}
+	}
+	return "", shown
 }

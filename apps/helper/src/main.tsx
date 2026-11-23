@@ -5,6 +5,7 @@ import { listen } from '@tauri-apps/api/event';
 import App from './App';
 import { ConsentWindow } from './windows/ConsentWindow';
 import { SessionBanner } from './windows/SessionBanner';
+import { watchRuntimeConfig } from './lib/branding';
 import { initTheme } from './lib/theme';
 
 // Initialize theme before rendering
@@ -29,6 +30,11 @@ function BannerWindow() {
   return <SessionBanner label={data.label} startedAt={data.startedAt} />;
 }
 
+function RuntimeDisplay({ children }: { children: React.ReactNode }) {
+  useEffect(() => window.location.hash === '#consent' || window.location.hash === '#banner' ? watchRuntimeConfig() : undefined, []);
+  return <>{children}</>;
+}
+
 // ── Entry point — branch on window.location.hash ─────────────────────────────
 
 const hash = window.location.hash;
@@ -46,6 +52,6 @@ if (hash === '#consent') {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    {root}
+    <RuntimeDisplay>{root}</RuntimeDisplay>
   </React.StrictMode>,
 );

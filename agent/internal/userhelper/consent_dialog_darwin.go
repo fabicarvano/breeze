@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os/exec"
 
+	"github.com/breeze-rmm/agent/internal/i18n"
 	"github.com/breeze-rmm/agent/internal/ipc"
 )
 
@@ -20,8 +21,10 @@ import (
 func showConsentDialogOS(ctx context.Context, req ipc.ConsentRequest, presented func()) dialogOutcome {
 	title, body := buildConsentDialogText(req)
 	script := fmt.Sprintf(
-		`display dialog "%s" with title "%s" buttons {"Deny", "Allow"} default button "Allow" cancel button "Deny" with icon caution`,
+		`display dialog "%s" with title "%s" buttons {"%s", "%s"} default button "%s" cancel button "%s" with icon caution`,
 		escapeAppleScript(body), escapeAppleScript(title),
+		escapeAppleScript(i18n.Text("Deny")), escapeAppleScript(i18n.Text("Allow")),
+		escapeAppleScript(i18n.Text("Allow")), escapeAppleScript(i18n.Text("Deny")),
 	)
 	if req.TimeoutMs > 0 {
 		script += fmt.Sprintf(" giving up after %d", (req.TimeoutMs+999)/1000)

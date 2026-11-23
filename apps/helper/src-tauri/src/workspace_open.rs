@@ -45,25 +45,49 @@ fn current_platform() -> Platform {
 /// Everything else -> Err. Never accepts local paths, URLs, or relative paths.
 fn validate_unc(path: &str) -> Result<UncParts, String> {
     if path.contains('\0') {
-        return Err("Path must not contain NUL bytes".to_string());
+        return Err(crate::locale::text(
+            "Path must not contain NUL bytes",
+            "O caminho não pode conter bytes NUL",
+        )
+        .to_string());
     }
     if path.contains('/') {
-        return Err("Path must use backslash separators only".to_string());
+        return Err(crate::locale::text(
+            "Path must use backslash separators only",
+            "O caminho deve usar apenas barras invertidas como separadores",
+        )
+        .to_string());
     }
-    let rest = path
-        .strip_prefix(r"\\")
-        .ok_or_else(|| r"Path must be a UNC path starting with \\".to_string())?;
+    let rest = path.strip_prefix(r"\\").ok_or_else(|| {
+        crate::locale::text(
+            r"Path must be a UNC path starting with \\",
+            "O caminho deve ser um caminho UNC iniciado por duas barras invertidas",
+        )
+        .to_string()
+    })?;
 
     let segments: Vec<&str> = rest.split('\\').collect();
     if segments.len() < 2 {
-        return Err("UNC path must include a host and a share".to_string());
+        return Err(crate::locale::text(
+            "UNC path must include a host and a share",
+            "O caminho UNC deve incluir um host e um compartilhamento",
+        )
+        .to_string());
     }
     for segment in &segments {
         if segment.is_empty() {
-            return Err("UNC path must not contain empty segments".to_string());
+            return Err(crate::locale::text(
+                "UNC path must not contain empty segments",
+                "O caminho UNC não pode conter segmentos vazios",
+            )
+            .to_string());
         }
         if *segment == "." || *segment == ".." {
-            return Err("UNC path must not contain dot segments".to_string());
+            return Err(crate::locale::text(
+                "UNC path must not contain dot segments",
+                "O caminho UNC não pode conter segmentos de ponto",
+            )
+            .to_string());
         }
     }
 
@@ -107,7 +131,11 @@ fn resolve_open_target(
             }
             Ok(unc)
         }
-        Platform::Linux => Err("Opening shared files is not supported on this platform".to_string()),
+        Platform::Linux => Err(crate::locale::text(
+            "Opening shared files is not supported on this platform",
+            "Esta plataforma não suporta abrir arquivos compartilhados",
+        )
+        .to_string()),
     }
 }
 
@@ -136,7 +164,11 @@ pub async fn open_workspace_path(
                 "[helper] Failed to open workspace path {}: {}",
                 target, e
             ));
-            "Couldn't open the file on this machine.".to_string()
+            crate::locale::text(
+                "Couldn't open the file on this machine.",
+                "Não foi possível abrir o arquivo neste computador.",
+            )
+            .to_string()
         })
 }
 

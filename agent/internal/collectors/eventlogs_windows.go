@@ -81,14 +81,15 @@ func (c *EventLogCollector) Collect() ([]EventLogEntry, error) {
 
 // winEvent represents a single Windows Event Log entry from PowerShell JSON output
 type winEvent struct {
-	RecordId         int64  `json:"RecordId"`
-	LogName          string `json:"LogName"`
-	Level            int    `json:"Level"`
-	LevelDisplayName string `json:"LevelDisplayName"`
-	TimeCreated      string `json:"TimeCreated"`
-	ProviderName     string `json:"ProviderName"`
-	Id               int    `json:"Id"`
-	Message          string `json:"Message"`
+	RecordId           int64  `json:"RecordId"`
+	LogName            string `json:"LogName"`
+	Level              int    `json:"Level"`
+	LevelDisplayName   string `json:"LevelDisplayName"`
+	TimeCreated        string `json:"TimeCreated"`
+	ProviderName       string `json:"ProviderName"`
+	Id                 int    `json:"Id"`
+	Message            string `json:"Message"`
+	ServiceDisplayName string `json:"ServiceDisplayName"`
 }
 
 // collectSecurityEvents gathers auth failures, lockouts, privilege escalation from Security log
@@ -107,11 +108,7 @@ func (c *EventLogCollector) collectSecurityEvents(since time.Time) ([]EventLogEn
 			Source:    truncateCollectorString(e.ProviderName),
 			EventID:   truncateCollectorString(fmt.Sprintf("%d:%d", e.Id, e.RecordId)),
 			Message:   truncateString(e.Message, 500),
-			Details: map[string]any{
-				"recordId": e.RecordId,
-				"logName":  truncateCollectorString(e.LogName),
-				"eventId":  e.Id,
-			},
+			Details:   winEventDetails(e),
 		})
 		if len(results) >= collectorResultLimit {
 			break
@@ -144,11 +141,7 @@ func (c *EventLogCollector) collectSystemErrors(since time.Time, categories []st
 			Source:    truncateCollectorString(e.ProviderName),
 			EventID:   truncateCollectorString(fmt.Sprintf("%d:%d", e.Id, e.RecordId)),
 			Message:   truncateString(e.Message, 500),
-			Details: map[string]any{
-				"recordId": e.RecordId,
-				"logName":  truncateCollectorString(e.LogName),
-				"eventId":  e.Id,
-			},
+			Details:   winEventDetails(e),
 		})
 		if len(results) >= collectorResultLimit {
 			break
@@ -174,11 +167,7 @@ func (c *EventLogCollector) collectApplicationCrashes(since time.Time) ([]EventL
 			Source:    truncateCollectorString(e.ProviderName),
 			EventID:   truncateCollectorString(fmt.Sprintf("%d:%d", e.Id, e.RecordId)),
 			Message:   truncateString(e.Message, 500),
-			Details: map[string]any{
-				"recordId": e.RecordId,
-				"logName":  truncateCollectorString(e.LogName),
-				"eventId":  e.Id,
-			},
+			Details:   winEventDetails(e),
 		})
 		if len(results) >= collectorResultLimit {
 			break
@@ -200,7 +189,7 @@ func (c *EventLogCollector) collectPowerEvents(since time.Time) ([]EventLogEntry
 	}
 	psCmd := fmt.Sprintf(
 		`Get-WinEvent -FilterHashtable @{LogName='System'; Id=%s; StartTime='%s'} -MaxEvents 50 -ErrorAction SilentlyContinue | `+
-			`Select-Object RecordId, LogName, Level, LevelDisplayName, @{N='TimeCreated';E={$_.TimeCreated.ToString('o')}}, ProviderName, Id, Message | `+
+			`Select-Object RecordId, LogName, Level, LevelDisplayName, @{N='TimeCreated';E={$_.TimeCreated.ToString('o')}}, ProviderName, Id, Message, @{N='ServiceDisplayName';E={if ($_.ProviderName -eq 'Service Control Manager' -and $_.Id -eq 7031 -and $_.Properties.Count -gt 0) {[string]$_.Properties[0].Value}}} | `+
 			`ConvertTo-Json -Depth 2 -Compress`,
 		strings.Join(ids, ","), sinceStr,
 	)
@@ -257,7 +246,7 @@ func (c *EventLogCollector) queryWinEvents(logName string, maxLevel int, since t
 
 	psCmd := fmt.Sprintf(
 		`Get-WinEvent -FilterHashtable @{LogName='%s'; Level=%s; StartTime='%s'} -MaxEvents 50 -ErrorAction SilentlyContinue | `+
-			`Select-Object RecordId, LogName, Level, LevelDisplayName, @{N='TimeCreated';E={$_.TimeCreated.ToString('o')}}, ProviderName, Id, Message | `+
+			`Select-Object RecordId, LogName, Level, LevelDisplayName, @{N='TimeCreated';E={$_.TimeCreated.ToString('o')}}, ProviderName, Id, Message, @{N='ServiceDisplayName';E={if ($_.ProviderName -eq 'Service Control Manager' -and $_.Id -eq 7031 -and $_.Properties.Count -gt 0) {[string]$_.Properties[0].Value}}} | `+
 			`ConvertTo-Json -Depth 2 -Compress`,
 		logName, levelFilter, sinceStr,
 	)
@@ -373,4 +362,15 @@ func truncateString(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen] + "..."
+}
+
+// Keep structured SCM identity out of unrelated event payloads.
+func winEventDetails(e winEvent) map[string]any {
+	details := map[string]any{
+		"recordId": e.RecordId, "logName": truncateCollectorString(e.LogName), "eventId": e.Id,
+	}
+	if e.Id == 7031 && strings.EqualFold(e.ProviderName, "Service Control Manager") && e.ServiceDisplayName != "" {
+		details["serviceDisplayName"] = truncateCollectorString(e.ServiceDisplayName)
+	}
+	return details
 }

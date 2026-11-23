@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { setHelperLocale } from '../../lib/i18n';
 import { FileTable } from './FileTable';
 import type { FinderFile } from '../../stores/workspaceStore';
 
@@ -112,4 +113,22 @@ it('Escape closes a mouse-opened row context menu without also walking the panel
 
   fireEvent.keyDown(menu, { key: 'Escape' });
   expect(onOuterEscape).not.toHaveBeenCalled();
+});
+
+
+it('updates interface labels when locale changes without changing indexed file metadata', () => {
+  const row = file({ name: 'English project report.pdf', inferredProjectLabel: 'English project', inferredDocType: 'Report' });
+  setHelperLocale('en');
+  render(<FileTable view="search" rows={[row]} onOpen={vi.fn()} onCopy={vi.fn()} />);
+  expect(screen.getByRole('button', { name: 'Name' })).toBeInTheDocument();
+  try {
+    act(() => setHelperLocale('pt-BR'));
+    expect(screen.getByRole('button', { name: 'Nome' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Mais ações' })).toBeInTheDocument();
+    expect(screen.getByText('English project report.pdf')).toBeInTheDocument();
+    expect(screen.getByText('English project')).toBeInTheDocument();
+    expect(screen.getByText('Report')).toBeInTheDocument();
+  } finally {
+    act(() => setHelperLocale('en'));
+  }
 });

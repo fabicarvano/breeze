@@ -1,3 +1,4 @@
+import { useI18n } from '../../lib/i18n';
 import { useState } from 'react';
 import type { WorkspaceProject } from '../../stores/workspaceStore';
 
@@ -9,6 +10,7 @@ export interface ProjectRailProps {
 
 /** Drop targets for drag-to-file: one entry per project from the crosswalk. */
 export function ProjectRail({ projects, onDropEmail }: ProjectRailProps) {
+  const t = useI18n();
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
 
   return (
@@ -34,7 +36,7 @@ export function ProjectRail({ projects, onDropEmail }: ProjectRailProps) {
         </div>
       ))}
       {projects.length === 0 && (
-        <span className="ws-project-rail-empty">No projects yet</span>
+        <span className="ws-project-rail-empty">{t("No projects yet")}</span>
       )}
     </div>
   );

@@ -1,3 +1,4 @@
+import { helperBrandingPreview } from '../../services/helperBrandingPreview';
 import { Hono } from 'hono';
 import { zValidator } from '../../lib/validation';
 import { eq } from 'drizzle-orm';
@@ -239,7 +240,7 @@ crudRoutes.get(
     const policy = await getConfigPolicy(id, auth);
     if (!policy) return c.json({ error: 'Configuration policy not found' }, 404);
 
-    return c.json(policy);
+    return c.json({ ...policy, helperBrandingPreview: await helperBrandingPreview(id, auth) });
   }
 );
 

@@ -1,0 +1,40 @@
+package i18n
+
+func init() {
+	ptBR["Restarting Now"] = "Reiniciando agora"
+	ptBR["Restart Scheduled"] = "Reinicialização agendada"
+	ptBR["Restart Imminent"] = "Reinicialização iminente"
+	ptBR["Restart Soon"] = "Reinicialização em breve"
+	ptBR["This computer restarts for updates in %s. Save your work now."] = "Este computador reiniciará para instalar atualizações em %s. Salve seu trabalho agora."
+	ptBR["A system restart for updates is scheduled in %s. Please save your work."] = "Uma reinicialização para instalar atualizações está agendada para daqui a %s. Salve seu trabalho."
+	ptBR["A system restart for updates begins in %s. Please save your work."] = "Uma reinicialização para instalar atualizações ocorrerá em %s. Salve seu trabalho."
+	ptBR["This restart can no longer be postponed."] = "Esta reinicialização não pode mais ser adiada."
+	ptBR["You can postpone this restart 1 more time."] = "Você pode adiar esta reinicialização mais 1 vez."
+	ptBR["You can postpone this restart %d more times."] = "Você pode adiar esta reinicialização mais %d vezes."
+	ptBR["second"] = "segundo"
+	ptBR["minute"] = "minuto"
+	ptBR["hour"] = "hora"
+	ptBR["Close"] = "Fechar"
+	ptBR["Restart now"] = "Reiniciar agora"
+	ptBR["Postpone "] = "Adiar "
+	ptBR["Breeze: Setup Complete"] = "Breeze: configuração concluída"
+	ptBR["Breeze: Permission Required"] = "Breeze: permissão necessária"
+	ptBR["Breeze server URL (e.g. https://rmm.example.com): "] = "URL do servidor Breeze (por exemplo, https://rmm.example.com): "
+	ptBR["Enter the support code your technician gave you: "] = "Digite o código de suporte fornecido pelo técnico: "
+	ptBR["Quick Support could not start."] = "Não foi possível iniciar o suporte rápido."
+	ptBR["Quick Support could not start: no Breeze server URL. Re-download the client from your technician's link."] = "Não foi possível iniciar o suporte rápido: URL do servidor Breeze ausente. Baixe o cliente novamente pelo link do técnico."
+	ptBR["Could not create a temporary working folder for this session."] = "Não foi possível criar uma pasta de trabalho temporária para esta sessão."
+	ptBR["This build can only contact its configured Breeze server. Ask your technician for a new code."] = "Esta versão só pode acessar o servidor Breeze configurado. Solicite um novo código ao técnico."
+	ptBR["That code is invalid or has expired — ask your technician for a new one."] = "O código é inválido ou expirou — solicite um novo código ao técnico."
+	ptBR["Could not reach the Breeze server. Check your internet connection and try again."] = "Não foi possível acessar o servidor Breeze. Verifique sua conexão com a internet e tente novamente."
+	ptBR["Could not start the support session. Ask your technician for a new code."] = "Não foi possível iniciar a sessão de suporte. Solicite um novo código ao técnico."
+	ptBR["Could not start the support session on this computer."] = "Não foi possível iniciar a sessão de suporte neste computador."
+	ptBR["This support session has expired. Closing."] = "Esta sessão de suporte expirou. Encerrando."
+	ptBR["Lost contact with the Breeze server for %s. Closing."] = "Sem contato com o servidor Breeze há %s. Encerrando."
+}
+
+func init() {
+	ptBR["seconds"] = "segundos"
+	ptBR["minutes"] = "minutos"
+	ptBR["hours"] = "horas"
+}

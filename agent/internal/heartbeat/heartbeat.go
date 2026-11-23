@@ -326,7 +326,8 @@ type HeartbeatResponse struct {
 }
 
 type HelperSettings struct {
-	Enabled bool `json:"enabled"`
+	Branding *helper.Branding `json:"branding,omitempty"`
+	Enabled  bool             `json:"enabled"`
 	// ShowTrayIcon is a POINTER so that an omitted field (an older server that
 	// predates #3202) is distinguishable from an explicit false. A plain bool
 	// would decode a missing key as false and silently hide the tray icon on
@@ -5333,6 +5334,7 @@ func (h *Heartbeat) processHeartbeatResponse(response *HeartbeatResponse) {
 	if response.HelperSettings != nil {
 		h.helperMgr.Apply(&helper.Settings{
 			Enabled:            response.HelperSettings.Enabled,
+			Branding:           response.HelperSettings.Branding,
 			ShowTrayIcon:       trayIconVisible(response.HelperSettings.ShowTrayIcon),
 			ShowOpenPortal:     response.HelperSettings.ShowOpenPortal,
 			ShowDeviceInfo:     response.HelperSettings.ShowDeviceInfo,

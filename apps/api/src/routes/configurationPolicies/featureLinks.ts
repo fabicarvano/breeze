@@ -1,3 +1,5 @@
+import { helperBrandingSchema } from '@breeze/shared/validators/helperBranding';
+import { assertHelperBrandingWriteLevels, HelperBrandingLevelError } from '../../services/helperBrandingPolicy';
 import { Hono, type Context, type Next } from 'hono';
 import { zValidator } from '../../lib/validation';
 import { zodValidationErrorBody } from '../../lib/zodIssues';
@@ -239,6 +241,17 @@ featureLinkRoutes.post(
       }
     }
 
+    if (data.featureType === 'helper' && data.inlineSettings) {
+      const settings = data.inlineSettings as Record<string, unknown>;
+      if (settings.branding !== undefined) {
+        const parsed = helperBrandingSchema.safeParse(settings.branding);
+        if (!parsed.success) return c.json(zodValidationErrorBody('Invalid Helper branding', parsed.error), 400);
+        settings.branding = parsed.data;
+      }
+      try { await assertHelperBrandingWriteLevels(id, settings); }
+      catch (error) { if (error instanceof HelperBrandingLevelError) return c.json({ error: error.message }, 400); throw error; }
+    }
+
     if (data.featureType === 'patch') {
       const parsed = patchInlineSettingsSchema.safeParse(data.inlineSettings ?? {});
       if (!parsed.success) {
@@ -426,6 +439,7 @@ featureLinkRoutes.post(
             { userId: auth.user.id }
           );
     } catch (error) {
+      if (error instanceof HelperBrandingLevelError) return c.json({ error: error.message }, 400);
       if (error instanceof AutomationReferenceAuthorizationError) {
         return c.json({ error: 'Unknown or unauthorized automation reference' }, 400);
       }
@@ -533,6 +547,17 @@ featureLinkRoutes.patch(
       if (!validation.valid) {
         return c.json({ error: validation.error }, 400);
       }
+    }
+
+    if (existingLink.featureType === 'helper' && data.inlineSettings) {
+      const settings = data.inlineSettings as Record<string, unknown>;
+      if (settings.branding !== undefined) {
+        const parsed = helperBrandingSchema.safeParse(settings.branding);
+        if (!parsed.success) return c.json(zodValidationErrorBody('Invalid Helper branding', parsed.error), 400);
+        settings.branding = parsed.data;
+      }
+      try { await assertHelperBrandingWriteLevels(id, settings); }
+      catch (error) { if (error instanceof HelperBrandingLevelError) return c.json({ error: error.message }, 400); throw error; }
     }
 
     if (data.inlineSettings) {
@@ -688,6 +713,7 @@ featureLinkRoutes.patch(
           })
         : await updateFeatureLink(linkId, data, id, { userId: auth.user.id });
     } catch (error) {
+      if (error instanceof HelperBrandingLevelError) return c.json({ error: error.message }, 400);
       if (error instanceof AutomationReferenceAuthorizationError) {
         return c.json({ error: 'Unknown or unauthorized automation reference' }, 400);
       }
@@ -756,7 +782,9 @@ featureLinkRoutes.delete(
       if (!gate.allowed) return c.json(gate.body, 403);
     }
 
-    const deleted = await removeFeatureLink(linkId, id);
+    let deleted;
+    try { deleted = await removeFeatureLink(linkId, id); }
+    catch (error) { if (error instanceof HelperBrandingLevelError) return c.json({ error: error.message }, 400); throw error; }
     if (!deleted) return c.json({ error: 'Feature link not found' }, 404);
 
     writeRouteAudit(c, {

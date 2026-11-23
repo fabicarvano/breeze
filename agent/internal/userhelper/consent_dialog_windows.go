@@ -9,6 +9,7 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/breeze-rmm/agent/internal/i18n"
 	"github.com/breeze-rmm/agent/internal/ipc"
 )
 
@@ -40,7 +41,7 @@ const (
 // user decision (classifyMessageBoxReturn).
 func showConsentDialogOS(ctx context.Context, req ipc.ConsentRequest, presented func()) dialogOutcome {
 	titleStr, bodyStr := buildConsentDialogText(req)
-	bodyStr += "\r\n\r\nSelect Yes to allow, or No to decline."
+	bodyStr += i18n.Text("\r\n\r\nSelect Yes to allow, or No to decline.")
 	title, err := syscall.UTF16PtrFromString(titleStr)
 	if err != nil {
 		return dialogUnavailable

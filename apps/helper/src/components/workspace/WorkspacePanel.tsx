@@ -1,3 +1,4 @@
+import { t, useI18n, getHelperLocale } from '../../lib/i18n';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useWorkspaceStore, type FinderFile } from '../../stores/workspaceStore';
 import { useChatStore } from '../../stores/chatStore';
@@ -36,13 +37,13 @@ export function formatWhen(dateStr: string | null | undefined): string | null {
   if (Number.isNaN(d.getTime())) return null;
   const diffMs = Date.now() - d.getTime();
   const diffMins = Math.floor(diffMs / 60000);
-  if (diffMins < 1) return 'Just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffMins < 1) return t('Just now');
+  if (diffMins < 60) return t('{count}m ago', { count: diffMins });
   const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffHours < 24) return t('{count}h ago', { count: diffHours });
   const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return d.toLocaleDateString();
+  if (diffDays < 7) return t('{count}d ago', { count: diffDays });
+  return d.toLocaleDateString(getHelperLocale());
 }
 
 /**
@@ -69,13 +70,12 @@ function renderFileMeta(file: FinderFile, openError: boolean): ReactNode {
       )}
       {showDisagreement && (
         <span className="ws-file-table-mismatch">
-          Filed in: {file.declaredProjectLabel ?? file.parentPath} · Reads as: {readsAs}
+          {t('Filed in:')} {file.declaredProjectLabel ?? file.parentPath} · {t('Reads as:')} {readsAs}
         </span>
       )}
       {openError && (
         <span className="ws-file-table-open-error">
-          Couldn't open — the share may be unreachable from this machine. Path copied
-          instead.
+          {t("Couldn't open — the share may be unreachable from this machine. Path copied instead.")}
         </span>
       )}
     </>
@@ -84,11 +84,12 @@ function renderFileMeta(file: FinderFile, openError: boolean): ReactNode {
 
 /** List-level fetch failure: the store's error message plus a retry action. */
 function ErrorRow({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const t = useI18n();
   return (
     <div className="ws-error-row">
       <span>{message}</span> —{' '}
       <button type="button" className="ws-error-retry" onClick={onRetry}>
-        retry
+        {t("retry")}
       </button>
     </div>
   );
@@ -105,6 +106,7 @@ export default function WorkspacePanel({
   // full-window rendering — and every existing screenshot/test — valid.
   embedded?: boolean;
 }) {
+  const t = useI18n();
   const {
     sources,
     results,
@@ -351,7 +353,7 @@ export default function WorkspacePanel({
     const path = file.openPath ?? file.relPath;
     navigator.clipboard.writeText(path).catch(() => {});
     recordActivity(file.id, 'copy_path', username);
-    toast('Path copied');
+    toast(t('Path copied'));
   };
 
   const handleOpen = async (file: FinderFile) => {
@@ -361,7 +363,7 @@ export default function WorkspacePanel({
     try {
       const invoke = await getTauriInvoke();
       if (!invoke) {
-        throw new Error('Opening files requires the desktop app');
+        throw new Error(t('Opening files requires the desktop app'));
       }
       await invoke('open_workspace_path', { input: { path: file.openPath } });
     } catch {
@@ -410,12 +412,12 @@ export default function WorkspacePanel({
         >
           <div className="helper-header-left" data-tauri-drag-region>
             {isMacOS && <div className="helper-traffic-light-spacer" />}
-            <span className="helper-title">Files</span>
+            <span className="helper-title">{t("Files")}</span>
           </div>
           <div className="helper-header-drag-spacer" data-tauri-drag-region />
           <div className="helper-header-actions">
             <button onClick={onClose} className="helper-btn helper-btn-sm">
-              Back
+              {t("Back")}
             </button>
           </div>
         </div>
@@ -424,10 +426,10 @@ export default function WorkspacePanel({
       <div className="helper-workspace-tabs">
         <SegmentedControl
           options={[
-            { key: 'search', label: 'Search' },
-            { key: 'browse', label: 'Browse' },
-            { key: 'recents', label: 'Recents' },
-            ...(filingEnabled ? [{ key: 'filing', label: 'Filing' }] : []),
+            { key: 'search', label: t('Search') },
+            { key: 'browse', label: t('Browse') },
+            { key: 'recents', label: t('Recents') },
+            ...(filingEnabled ? [{ key: 'filing', label: t('Filing') }] : []),
           ]}
           value={tab}
           onChange={(key) => switchTab(key as WorkspaceTab)}
@@ -442,7 +444,7 @@ export default function WorkspacePanel({
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search shared files..."
+              placeholder={t("Search shared files...")}
               className="helper-workspace-search-input"
               autoFocus
             />
@@ -461,14 +463,14 @@ export default function WorkspacePanel({
             )}
             {!loading && !error && !query.trim() && (
               <EmptyState
-                title="Search your firm's files"
-                hint="Everything indexed from your shares, searchable by name and content."
+                title={t("Search your firm's files")}
+                hint={t("Everything indexed from your shares, searchable by name and content.")}
               />
             )}
             {!loading && !error && query.trim() && results.length === 0 && (
               <EmptyState
-                title={`No matches for '${query.trim()}'`}
-                hint="Try fewer words, or clear filters."
+                title={t("No matches for '{query}'", { query: query.trim() })}
+                hint={t("Try fewer words, or clear filters.")}
               />
             )}
             {!loading && !error && query.trim() && results.length > 0 && (
@@ -502,7 +504,7 @@ export default function WorkspacePanel({
               </button>
             ))}
             {sources.length === 0 && (
-              <span className="helper-workspace-rail-empty">No sources yet</span>
+              <span className="helper-workspace-rail-empty">{t("No sources yet")}</span>
             )}
           </div>
           <div className="helper-workspace-main">
@@ -522,7 +524,7 @@ export default function WorkspacePanel({
                   className="helper-workspace-crumb"
                   onClick={() => runBrowse(browsePath.sourceId, '')}
                 >
-                  {activeSource?.displayName ?? 'Top'}
+                  {activeSource?.displayName ?? t('Top')}
                 </button>
                 {crumbSegments.map((seg, i) => (
                   <span key={`${seg}-${i}`}>
@@ -554,11 +556,11 @@ export default function WorkspacePanel({
               {!loading && !error && browsePath && entries.length === 0 && (
                 filters.project || filters.docType ? (
                   <EmptyState
-                    title="No matches in this folder"
-                    hint="Clear filters to see everything."
+                    title={t("No matches in this folder")}
+                    hint={t("Clear filters to see everything.")}
                   />
                 ) : (
-                  <EmptyState title="This folder is empty" />
+                  <EmptyState title={t("This folder is empty")} />
                 )
               )}
               {!loading && !error && entries.length > 0 && (
@@ -585,13 +587,13 @@ export default function WorkspacePanel({
               )}
               {!loading && !error && filings.length === 0 && (
                 <EmptyState
-                  title="All mail filed"
-                  hint="New unfiled mail will appear here."
+                  title={t("All mail filed")}
+                  hint={t("New unfiled mail will appear here.")}
                 />
               )}
               {!loading && !error && filings.length > 0 && (
                 <>
-                  <div className="helper-workspace-section-title">Unfiled mail</div>
+                  <div className="helper-workspace-section-title">{t("Unfiled mail")}</div>
                   {filings.map((filing) => (
                     <FilingCard
                       key={filing.fileIndexId}
@@ -626,11 +628,11 @@ export default function WorkspacePanel({
             )}
             {!loading && !error && (
               <>
-                <div className="helper-workspace-section-title">Your recent files</div>
+                <div className="helper-workspace-section-title">{t("Your recent files")}</div>
                 {recent.length === 0 && (
                   <EmptyState
-                    title="Nothing recent yet"
-                    hint="Files you open or copy will show up here."
+                    title={t("Nothing recent yet")}
+                    hint={t("Files you open or copy will show up here.")}
                   />
                 )}
                 {recent.length > 0 && (
@@ -645,10 +647,10 @@ export default function WorkspacePanel({
                   />
                 )}
                 <div className="helper-workspace-section-title">
-                  Recently active in your company
+                  {t("Recently active in your company")}
                 </div>
                 {department.length === 0 && (
-                  <div className="helper-history-empty">Nothing here yet.</div>
+                  <div className="helper-history-empty">{t("Nothing here yet.")}</div>
                 )}
                 {department.length > 0 && (
                   <FileTable

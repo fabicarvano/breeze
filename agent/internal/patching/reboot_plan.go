@@ -20,6 +20,7 @@ package patching
 
 import (
 	"fmt"
+	"github.com/breeze-rmm/agent/internal/i18n"
 	"strconv"
 	"time"
 )
@@ -121,8 +122,8 @@ func PlanReboot(totalDelay time.Duration) RebootPlan {
 
 	closing := RebootNotification{
 		After:   plan.OSInvokeAt,
-		Title:   "Restarting Now",
-		Body:    fmt.Sprintf("This computer restarts for updates in %s. Save your work now.", humanizeRebootDelay(plan.OSGrace)),
+		Title:   i18n.Text("Restarting Now"),
+		Body:    i18n.Format("This computer restarts for updates in %s. Save your work now.", humanizeRebootDelay(plan.OSGrace)),
 		Urgency: "critical",
 	}
 
@@ -135,7 +136,7 @@ func PlanReboot(totalDelay time.Duration) RebootPlan {
 		plan.OSInvokeAt = 0
 		plan.OSGrace = totalDelay
 		closing.After = 0
-		closing.Body = fmt.Sprintf("This computer restarts for updates in %s. Save your work now.", humanizeRebootDelay(totalDelay))
+		closing.Body = i18n.Format("This computer restarts for updates in %s. Save your work now.", humanizeRebootDelay(totalDelay))
 		plan.Notifications = []RebootNotification{closing}
 		return plan
 	}
@@ -146,8 +147,8 @@ func PlanReboot(totalDelay time.Duration) RebootPlan {
 		// "Restart", not "Reboot", throughout: it is what both Windows and macOS
 		// say in their own user-facing UI, and these strings go to an end user
 		// rather than a technician.
-		Title:   "Restart Scheduled",
-		Body:    fmt.Sprintf("A system restart for updates is scheduled in %s. Please save your work.", humanizeRebootDelay(totalDelay)),
+		Title:   i18n.Text("Restart Scheduled"),
+		Body:    i18n.Format("A system restart for updates is scheduled in %s. Please save your work.", humanizeRebootDelay(totalDelay)),
 		Urgency: leadUrgency(totalDelay),
 	})
 
@@ -164,7 +165,7 @@ func PlanReboot(totalDelay time.Duration) RebootPlan {
 		plan.Notifications = append(plan.Notifications, RebootNotification{
 			After:   at,
 			Title:   reminderTitle(before),
-			Body:    fmt.Sprintf("A system restart for updates begins in %s. Please save your work.", humanizeRebootDelay(before)),
+			Body:    i18n.Format("A system restart for updates begins in %s. Please save your work.", humanizeRebootDelay(before)),
 			Urgency: reminderUrgency(before),
 		})
 	}
@@ -191,23 +192,26 @@ func reminderUrgency(before time.Duration) string {
 
 func reminderTitle(before time.Duration) string {
 	if before <= 5*time.Minute {
-		return "Restart Imminent"
+		return i18n.Text("Restart Imminent")
 	}
-	return "Restart Soon"
+	return i18n.Text("Restart Soon")
 }
 
 // humanizeRebootDelay renders a delay the way a person would say it.
-// Deliberately minimal — the agent has no i18n and these strings surface in a
-// desktop toast.
+// Units are localized; arithmetic and machine shutdown arguments stay fixed.
 func humanizeRebootDelay(d time.Duration) string {
+	return humanizeRebootDelayLocale(d, i18n.Locale())
+}
+
+func humanizeRebootDelayLocale(d time.Duration, locale string) string {
 	if d < time.Minute {
-		return pluralize(int(d.Round(time.Second)/time.Second), "second")
+		return pluralize(int(d.Round(time.Second)/time.Second), i18n.ForLocale(locale, "second"))
 	}
 	minutes := int(d.Round(time.Minute) / time.Minute)
 	if minutes < 60 || minutes%60 != 0 {
-		return pluralize(minutes, "minute")
+		return pluralize(minutes, i18n.ForLocale(locale, "minute"))
 	}
-	return pluralize(minutes/60, "hour")
+	return pluralize(minutes/60, i18n.ForLocale(locale, "hour"))
 }
 
 // graceMinutesAtLeastOne converts an OS grace to whole minutes, never returning

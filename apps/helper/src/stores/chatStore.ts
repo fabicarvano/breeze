@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n';
 import { create } from 'zustand';
 import {
   getTauriInvoke,
@@ -457,7 +458,7 @@ export async function processSSELines(
         }
 
         case 'error': {
-          setDirect({ error: event.message || 'An error occurred' });
+          setDirect({ error: event.message || t('An error occurred') });
           break;
         }
 
@@ -677,7 +678,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             () => get().initialize(),
             () => get().connectionState,
           );
-          throw new Error(HELPER_TOKEN_UNAVAILABLE_MESSAGE);
+          throw new Error(t(HELPER_TOKEN_UNAVAILABLE_MESSAGE));
         }
       }
 
@@ -734,9 +735,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       if (!res.ok) {
         const data = (() => {
-          try { return JSON.parse(res.body); } catch { return { error: 'Failed to load session' }; }
+          try { return JSON.parse(res.body); } catch { return { error: t('Failed to load session') }; }
         })();
-        throw new Error(data.error || 'Failed to load session');
+        throw new Error(data.error || t('Failed to load session'));
       }
 
       const rawMessages = JSON.parse(res.body) as Array<{
@@ -762,7 +763,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       set({ sessionId: id, messages, error: null });
     } catch (err) {
-      set({ error: err instanceof Error ? err.message : 'Failed to load session' });
+      set({ error: err instanceof Error ? err.message : t('Failed to load session') });
     }
   },
 
@@ -824,10 +825,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
             try {
               return JSON.parse(createRes.body);
             } catch {
-              return { error: 'Failed to create session' };
+              return { error: t('Failed to create session') };
             }
           })();
-          throw new Error(data.error || 'Failed to create session');
+          throw new Error(data.error || t('Failed to create session'));
         }
 
         const sessionData = JSON.parse(createRes.body);
@@ -878,19 +879,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
           try {
             return JSON.parse(errorText);
           } catch {
-            return { error: errorText || 'Failed to send message' };
+            return { error: errorText || t('Failed to send message') };
           }
         })();
 
         if (streamResult.status === 409) {
           set((s) => ({
             messages: s.messages.filter((m) => m.id !== userMsgId),
-            error: data.error || 'Another response is still in progress.',
+            error: data.error || t('Another response is still in progress.'),
           }));
           return;
         }
 
-        throw new Error(data.error || 'Failed to send message');
+        throw new Error(data.error || t('Failed to send message'));
       }
     } catch (err) {
       set({
@@ -953,12 +954,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       if (!res.ok) {
         const data = (() => {
-          try { return JSON.parse(res.body); } catch { console.error('[Helper] Failed to parse approval response:', res.body.slice(0, 200)); return { error: 'Failed to process approval' }; }
+          try { return JSON.parse(res.body); } catch { console.error('[Helper] Failed to parse approval response:', res.body.slice(0, 200)); return { error: t('Failed to process approval') }; }
         })();
-        set({ error: data.error || 'Failed to process approval' });
+        set({ error: data.error || t('Failed to process approval') });
       }
     } catch (err) {
-      set({ error: err instanceof Error ? err.message : 'Failed to process approval' });
+      set({ error: err instanceof Error ? err.message : t('Failed to process approval') });
     } finally {
       set({ pendingApproval: null });
     }
@@ -983,12 +984,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
         set({ isFlagged: true });
       } else {
         const data = (() => {
-          try { return JSON.parse(res.body); } catch { return { error: 'Failed to flag session' }; }
+          try { return JSON.parse(res.body); } catch { return { error: t('Failed to flag session') }; }
         })();
-        set({ error: data.error || 'Failed to flag session' });
+        set({ error: data.error || t('Failed to flag session') });
       }
     } catch (err) {
-      set({ error: err instanceof Error ? err.message : 'Failed to flag session' });
+      set({ error: err instanceof Error ? err.message : t('Failed to flag session') });
     }
   },
 }));

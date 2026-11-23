@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/breeze-rmm/agent/internal/i18n"
 	"github.com/breeze-rmm/agent/internal/ipc"
 )
 
@@ -278,7 +279,7 @@ func classifyOsascriptResult(output string, failed bool) dialogOutcome {
 	switch {
 	case strings.Contains(output, "gave up:true"):
 		return dialogExpired
-	case strings.Contains(output, "button returned:Allow"):
+	case strings.Contains(output, "button returned:"+i18n.Text("Allow")):
 		return dialogAllowed
 	default:
 		return dialogUnavailable
@@ -319,7 +320,11 @@ func isBidiFormattingRune(r rune) bool {
 // Examples: "Billy (billy@example.com) from Olive Technology is requesting
 // remote access to view and control this computer."
 func buildConsentDialogText(req ipc.ConsentRequest) (title, body string) {
-	who := "A technician"
+	return buildConsentDialogTextForLocale(i18n.Locale(), req)
+}
+
+func buildConsentDialogTextForLocale(locale string, req ipc.ConsentRequest) (title, body string) {
+	who := i18n.ForLocale(locale, "A technician")
 	if req.TechnicianName != "" {
 		who = req.TechnicianName
 		if req.TechnicianEmail != "" {
@@ -327,7 +332,7 @@ func buildConsentDialogText(req ipc.ConsentRequest) (title, body string) {
 		}
 	}
 	if req.OrgName != "" {
-		who += " from " + req.OrgName
+		who += i18n.ForLocale(locale, " from ") + req.OrgName
 	}
-	return "Remote Support Request", who + " is requesting remote access to view and control this computer."
+	return i18n.ForLocale(locale, "Remote Support Request"), fmt.Sprintf(i18n.ForLocale(locale, "%s is requesting remote access to view and control this computer."), who)
 }

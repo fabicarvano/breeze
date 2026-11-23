@@ -1,6 +1,8 @@
 // Shared HTTP plumbing for talking to the Breeze API from the Helper.
 // Extracted verbatim from chatStore.ts — no behavior change.
 
+import type { HelperBranding } from './branding';
+
 declare global {
   interface Window {
     __TAURI_INTERNALS__?: unknown;
@@ -8,6 +10,8 @@ declare global {
 }
 
 export interface AgentConfig {
+  locale?: string;
+  branding?: HelperBranding | null;
   api_url: string;
   token?: string;
   agent_id: string;

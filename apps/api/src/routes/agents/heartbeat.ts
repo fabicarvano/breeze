@@ -2326,7 +2326,7 @@ heartbeatRoutes.post('/:id/heartbeat', bodyLimit({ maxSize: 5 * 1024 * 1024, onE
       // statement. A miss resolves inside its own savepoint, as before (a SQL
       // error there must not abort the shared transaction — see above).
       try {
-        const cachedHelper = await readCachedHelperSettings(scoped.deviceId);
+        const cachedHelper = await readCachedHelperSettings(scoped.deviceId, hierarchyOpts);
         helperSettings = cachedHelper ?? await withDbTransaction(() =>
           buildHelperConfigUpdate(scoped.deviceId, scoped.deviceOrgId, {
             ...hierarchyOpts,

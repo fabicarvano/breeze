@@ -24,7 +24,9 @@ import (
 	"github.com/breeze-rmm/agent/internal/elevaccount"
 	"github.com/breeze-rmm/agent/internal/eventlog"
 	"github.com/breeze-rmm/agent/internal/heartbeat"
+	"github.com/breeze-rmm/agent/internal/helper"
 	"github.com/breeze-rmm/agent/internal/hostpolicy"
+	"github.com/breeze-rmm/agent/internal/i18n"
 	"github.com/breeze-rmm/agent/internal/ipc"
 	"github.com/breeze-rmm/agent/internal/logging"
 	"github.com/breeze-rmm/agent/internal/mtls"
@@ -213,12 +215,12 @@ func waitForEnrollment(ctx context.Context, cfgFile string) *config.Config {
 var rootCmd = &cobra.Command{
 	Use:   "breeze-agent",
 	Short: agentRootShort(),
-	Long:  `Breeze Agent - Remote Monitoring and Management agent for Windows, macOS, and Linux`,
+	Long:  i18n.Text(`Breeze Agent - Remote Monitoring and Management agent for Windows, macOS, and Linux`),
 }
 
 var startCmd = &cobra.Command{
 	Use:   "start",
-	Short: "Start the agent",
+	Short: i18n.Text("Start the agent"),
 	Run: func(cmd *cobra.Command, args []string) {
 		runAgent()
 	},
@@ -230,7 +232,7 @@ var startCmd = &cobra.Command{
 // unit file references `start`.
 var runCmd = &cobra.Command{
 	Use:    "run",
-	Short:  "Deprecated: alias for 'start'",
+	Short:  i18n.Text("Deprecated: alias for 'start'"),
 	Hidden: true,
 	Run: func(cmd *cobra.Command, args []string) {
 		runAgent()
@@ -239,14 +241,14 @@ var runCmd = &cobra.Command{
 
 var enrollCmd = &cobra.Command{
 	Use:   "enroll [enrollment-key]",
-	Short: "Enroll this device with the Breeze server",
-	Long: `Enroll this device with the Breeze server.
+	Short: i18n.Text("Enroll this device with the Breeze server"),
+	Long: i18n.Text(`Enroll this device with the Breeze server.
 
 The enrollment key may be given positionally (visible in this process's own
 command line to any local user who can list processes — kept only for manual,
 interactive use and backward compatibility) or, preferably, via the
 BREEZE_AGENT_ENROLLMENT_KEY environment variable, which install.sh and the
-other unattended install paths use so the key never appears in argv.`,
+other unattended install paths use so the key never appears in argv.`),
 	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		key := ""
@@ -259,7 +261,7 @@ other unattended install paths use so the key never appears in argv.`,
 
 var bootstrapCmd = &cobra.Command{
 	Use:    "bootstrap",
-	Short:  "Redeem an installer bootstrap token and enroll (used by the MSI)",
+	Short:  i18n.Text("Redeem an installer bootstrap token and enroll (used by the MSI)"),
 	Hidden: true,
 	Run: func(cmd *cobra.Command, args []string) {
 		runBootstrap()
@@ -268,7 +270,7 @@ var bootstrapCmd = &cobra.Command{
 
 var versionCmd = &cobra.Command{
 	Use:   "version",
-	Short: "Print the version number",
+	Short: i18n.Text("Print the version number"),
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Printf("Breeze Agent v%s\n", version)
 	},
@@ -276,7 +278,7 @@ var versionCmd = &cobra.Command{
 
 var statusCmd = &cobra.Command{
 	Use:   "status",
-	Short: "Check agent status",
+	Short: i18n.Text("Check agent status"),
 	Run: func(cmd *cobra.Command, args []string) {
 		checkStatus()
 	},
@@ -289,7 +291,7 @@ var statusCmd = &cobra.Command{
 // runUninstallNotify.
 var uninstallNotifyCmd = &cobra.Command{
 	Use:    "uninstall-notify",
-	Short:  "Best-effort notify the server that this agent is about to be uninstalled (used by the uninstaller)",
+	Short:  i18n.Text("Best-effort notify the server that this agent is about to be uninstalled (used by the uninstaller)"),
 	Hidden: true,
 	Run: func(cmd *cobra.Command, args []string) {
 		runUninstallNotify()
@@ -298,11 +300,11 @@ var uninstallNotifyCmd = &cobra.Command{
 
 var userHelperCmd = &cobra.Command{
 	Use:   "user-helper",
-	Short: "Run as a per-user session helper (started automatically by the system)",
-	Long: `The user-helper runs in the logged-in user's session context and provides
+	Short: i18n.Text("Run as a per-user session helper (started automatically by the system)"),
+	Long: i18n.Text(`The user-helper runs in the logged-in user's session context and provides
 desktop notifications, system tray icon, screen capture, clipboard access,
 and user-context script execution. It communicates with the root daemon
-via a local IPC socket and has no direct network access.`,
+via a local IPC socket and has no direct network access.`),
 	Run: func(cmd *cobra.Command, args []string) {
 		runUserHelper()
 	},
@@ -310,25 +312,25 @@ via a local IPC socket and has no direct network access.`,
 
 var desktopHelperCmd = &cobra.Command{
 	Use:   "desktop-helper",
-	Short: "Run as the dedicated desktop helper",
+	Short: i18n.Text("Run as the dedicated desktop helper"),
 	Run: func(cmd *cobra.Command, args []string) {
 		runDesktopHelper()
 	},
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is /etc/breeze/agent.yaml)")
-	rootCmd.PersistentFlags().StringVar(&serverURL, "server", "", "Breeze server URL")
-	enrollCmd.Flags().StringVar(&enrollmentSecret, "enrollment-secret", "", "Enrollment secret (AGENT_ENROLLMENT_SECRET on the server)")
-	enrollCmd.Flags().StringVar(&enrollSiteID, "site-id", "", "Site ID to enroll into (optional, overrides enrollment key default)")
-	enrollCmd.Flags().StringVar(&enrollDeviceRole, "device-role", "", "Device role override (e.g. workstation, server)")
-	enrollCmd.Flags().BoolVar(&forceEnroll, "force", false, "Re-enroll even if already enrolled; replaces AgentID/AuthToken on success (no-op on failure)")
-	enrollCmd.Flags().BoolVar(&quietEnroll, "quiet", false, "Suppress stdout progress output (errors still go to stderr). Intended for unattended installs.")
-	bootstrapCmd.Flags().StringVar(&bootstrapInstallData, "install-data", "", "Pipe-packed bootstrap inputs from the MSI BootstrapEnroll CA: <OriginalDatabase>|<BOOTSTRAP_TOKEN>|<SERVER_URL>")
-	bootstrapCmd.Flags().BoolVar(&quietEnroll, "quiet", false, "Suppress stdout progress output (errors still go to stderr)")
-	supportCmd.Flags().StringVar(&supportCode, "code", "", "Quick Support code (overrides the code embedded in the filename)")
-	userHelperCmd.Flags().StringVar(&helperRole, "role", string(ipc.HelperRoleUser), "Helper role: 'system' (desktop capture) or 'user' (script execution)")
-	desktopHelperCmd.Flags().StringVar(&desktopContext, "context", ipc.DesktopContextUserSession, "Desktop context: 'user_session' or 'login_window'")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", i18n.Text("config file (default is /etc/breeze/agent.yaml)"))
+	rootCmd.PersistentFlags().StringVar(&serverURL, "server", "", i18n.Text("Breeze server URL"))
+	enrollCmd.Flags().StringVar(&enrollmentSecret, "enrollment-secret", "", i18n.Text("Enrollment secret (AGENT_ENROLLMENT_SECRET on the server)"))
+	enrollCmd.Flags().StringVar(&enrollSiteID, "site-id", "", i18n.Text("Site ID to enroll into (optional, overrides enrollment key default)"))
+	enrollCmd.Flags().StringVar(&enrollDeviceRole, "device-role", "", i18n.Text("Device role override (e.g. workstation, server)"))
+	enrollCmd.Flags().BoolVar(&forceEnroll, "force", false, i18n.Text("Re-enroll even if already enrolled; replaces AgentID/AuthToken on success (no-op on failure)"))
+	enrollCmd.Flags().BoolVar(&quietEnroll, "quiet", false, i18n.Text("Suppress stdout progress output (errors still go to stderr). Intended for unattended installs."))
+	bootstrapCmd.Flags().StringVar(&bootstrapInstallData, "install-data", "", i18n.Text("Pipe-packed bootstrap inputs from the MSI BootstrapEnroll CA: <OriginalDatabase>|<BOOTSTRAP_TOKEN>|<SERVER_URL>"))
+	bootstrapCmd.Flags().BoolVar(&quietEnroll, "quiet", false, i18n.Text("Suppress stdout progress output (errors still go to stderr)"))
+	supportCmd.Flags().StringVar(&supportCode, "code", "", i18n.Text("Quick Support code (overrides the code embedded in the filename)"))
+	userHelperCmd.Flags().StringVar(&helperRole, "role", string(ipc.HelperRoleUser), i18n.Text("Helper role: 'system' (desktop capture) or 'user' (script execution)"))
+	desktopHelperCmd.Flags().StringVar(&desktopContext, "context", ipc.DesktopContextUserSession, i18n.Text("Desktop context: 'user_session' or 'login_window'"))
 
 	rootCmd.AddCommand(startCmd)
 	rootCmd.AddCommand(runCmd)
@@ -405,6 +407,8 @@ func Main(v string) {
 		rootCmd.SetArgs(append([]string{"support"}, os.Args[1:]...))
 	}
 
+	rootCmd.InitDefaultHelpCmd()
+	localizeCommandHelp(rootCmd, i18n.Locale())
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -1316,7 +1320,7 @@ func runAgent() {
 	// wait cleanly.
 	cfg, err := config.Load(cfgFile)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to load config: %v\n", err)
+		fmt.Fprintf(os.Stderr, i18n.Text("Failed to load config: %v\n"), err)
 		os.Exit(1)
 	}
 	initBootstrapLogging(cfg)
@@ -1337,9 +1341,9 @@ func runAgent() {
 	comps, err := startAgentFn(cfg)
 	if err != nil {
 		if isPermissionError(err) {
-			fmt.Fprintln(os.Stderr, "Error: Permission denied reading agent configuration.")
-			fmt.Fprintln(os.Stderr, "The agent runs as a system service and should not be started manually.")
-			fmt.Fprintln(os.Stderr, "Check service status with:")
+			fmt.Fprintln(os.Stderr, i18n.Text("Error: Permission denied reading agent configuration."))
+			fmt.Fprintln(os.Stderr, i18n.Text("The agent runs as a system service and should not be started manually."))
+			fmt.Fprintln(os.Stderr, i18n.Text("Check service status with:"))
 			switch runtime.GOOS {
 			case "darwin":
 				fmt.Fprintln(os.Stderr, "  sudo breeze-agent status")
@@ -1352,7 +1356,7 @@ func runAgent() {
 			}
 			os.Exit(1)
 		}
-		fmt.Fprintf(os.Stderr, "Failed to start agent: %v\n", err)
+		fmt.Fprintf(os.Stderr, i18n.Text("Failed to start agent: %v\n"), err)
 		os.Exit(1)
 	}
 	// StopShipper waits on the shipper goroutine with no deadline of its own,
@@ -1571,7 +1575,7 @@ func enrollDevice(enrollmentKey string) {
 
 	if enrollmentKey == "" {
 		enrollError(catConfig,
-			"enrollment key required — pass it positionally or set BREEZE_AGENT_ENROLLMENT_KEY",
+			i18n.Text("enrollment key required — pass it positionally or set BREEZE_AGENT_ENROLLMENT_KEY"),
 			nil)
 	}
 
@@ -1580,8 +1584,8 @@ func enrollDevice(enrollmentKey string) {
 			"agentId", cfg.AgentID,
 			"server", cfg.ServerURL)
 		if !quietEnroll {
-			fmt.Printf("Agent is already enrolled with ID: %s\n", cfg.AgentID)
-			fmt.Println("Use --force to re-enroll, or delete the config file.")
+			fmt.Printf(i18n.Text("Agent is already enrolled with ID: %s\n"), cfg.AgentID)
+			fmt.Println(i18n.Text("Use --force to re-enroll, or delete the config file."))
 		}
 		return // exit 0 — not an error, allows && chains and MSI CAs to continue
 	}
@@ -1613,16 +1617,16 @@ func enrollDevice(enrollmentKey string) {
 
 	if isSystemServiceRunning() {
 		if !quietEnroll {
-			fmt.Println("Agent is already running via system service.")
+			fmt.Println(i18n.Text("Agent is already running via system service."))
 		}
 	} else if runtime.GOOS == "darwin" || runtime.GOOS == "linux" {
 		if !quietEnroll {
-			fmt.Println("Start the agent with:")
-			fmt.Println("  sudo breeze-agent service start")
+			fmt.Println(i18n.Text("Start the agent with:"))
+			fmt.Println(i18n.Text("  sudo breeze-agent service start"))
 		}
 	} else {
 		if !quietEnroll {
-			fmt.Println("Run 'breeze-agent start' to start the agent.")
+			fmt.Println(i18n.Text("Run 'breeze-agent start' to start the agent."))
 		}
 	}
 }
@@ -1655,7 +1659,7 @@ var saveEnrollmentFn = config.SaveEnrollment
 // enrollPreflightFailure reports a config directory the agent could not
 // create or secure BEFORE the enroll request, so nothing exists server-side.
 func enrollPreflightFailure(cfgFile string, err error) *enrollFailure {
-	return &enrollFailure{cat: catConfig, friendly: fmt.Sprintf(
+	return &enrollFailure{cat: catConfig, friendly: i18n.Format(
 		"could not create or secure the config directory %s, so no enrollment request was sent — run enrollment as SYSTEM (the MSI does) or from an elevated administrator prompt, then retry",
 		filepath.Dir(config.ResolveSavePath(cfgFile))), detail: err}
 }
@@ -1671,7 +1675,7 @@ func enrollSaveFailure(cfg *config.Config, cfgFile string, err error) *enrollFai
 	if cfg.DeviceID != "" {
 		device += ", deviceId=" + cfg.DeviceID
 	}
-	return &enrollFailure{cat: catConfig, friendly: fmt.Sprintf(
+	return &enrollFailure{cat: catConfig, friendly: i18n.Format(
 		"the server enrolled this device (%s) but its credentials could not be saved to %s, so the agent cannot check in. The device was created on the server and will stay pending: delete it in the dashboard, fix the cause below, then run enrollment again",
 		device, config.ResolveSavePath(cfgFile)), detail: err}
 }
@@ -1697,7 +1701,7 @@ func enrollWithConfig(cfg *config.Config, cfgFile, enrollmentKey, secret string)
 
 	enrollLog.Info("starting enrollment", "server", cfg.ServerURL)
 	if !quietEnroll {
-		fmt.Printf("Enrolling with server: %s\n", cfg.ServerURL)
+		fmt.Printf(i18n.Text("Enrolling with server: %s\n"), cfg.ServerURL)
 	}
 
 	hwCollector := collectors.NewHardwareCollector()
@@ -1739,8 +1743,8 @@ func enrollWithConfig(cfg *config.Config, cfgFile, enrollmentKey, secret string)
 		"os", systemInfo.OSVersion,
 		"arch", systemInfo.Architecture)
 	if !quietEnroll {
-		fmt.Printf("Hostname: %s\n", systemInfo.Hostname)
-		fmt.Printf("OS: %s (%s)\n", systemInfo.OSVersion, systemInfo.Architecture)
+		fmt.Printf(i18n.Text("Hostname: %s\n"), systemInfo.Hostname)
+		fmt.Printf(i18n.Text("OS: %s (%s)\n"), systemInfo.OSVersion, systemInfo.Architecture)
 	}
 
 	// Refuse to enroll with an empty hostname rather than let a fallback
@@ -1748,7 +1752,7 @@ func enrollWithConfig(cfg *config.Config, cfgFile, enrollmentKey, secret string)
 	// issue #439 — one prod device ended up with its UUID in the hostname
 	// column, which is worse than a loud failure because it looks legit.
 	if err := assertHostnameNonEmpty(systemInfo); err != nil {
-		return &enrollFailure{cat: catConfig, friendly: "hostname resolution failed on this machine — tried " +
+		return &enrollFailure{cat: catConfig, friendly: i18n.Text("hostname resolution failed on this machine — tried ") +
 			collectors.HostnameSourcesDescription() +
 			"; all returned empty. Refusing to enroll with an empty hostname.", detail: err}
 	}
@@ -1767,7 +1771,7 @@ func enrollWithConfig(cfg *config.Config, cfgFile, enrollmentKey, secret string)
 	}
 	enrollLog.Info("classified device role", "role", deviceRole)
 	if !quietEnroll {
-		fmt.Printf("Device role: %s\n", deviceRole)
+		fmt.Printf(i18n.Text("Device role: %s\n"), deviceRole)
 	}
 
 	// Orthogonal virtualization attribute (issue #1387): is this a VM, and on
@@ -1777,7 +1781,7 @@ func enrollWithConfig(cfg *config.Config, cfgFile, enrollmentKey, secret string)
 	if virt.IsVirtual {
 		enrollLog.Info("detected virtualization", "platform", virt.Platform)
 		if !quietEnroll {
-			fmt.Printf("Virtualization: %s\n", virt.Platform)
+			fmt.Printf(i18n.Text("Virtualization: %s\n"), virt.Platform)
 		}
 	}
 
@@ -1819,7 +1823,7 @@ func enrollWithConfig(cfg *config.Config, cfgFile, enrollmentKey, secret string)
 
 	enrollLog.Info("sending enrollment request")
 	if !quietEnroll {
-		fmt.Println("Sending enrollment request...")
+		fmt.Println(i18n.Text("Sending enrollment request..."))
 	}
 
 	enrollResp, err := client.Enroll(enrollReq)
@@ -1837,7 +1841,7 @@ func enrollWithConfig(cfg *config.Config, cfgFile, enrollmentKey, secret string)
 	// via the bootstrap flow, which already hard-refused it through
 	// gateRedeemResponse before enrollDevice ever ran.
 	if err := gateEnrollResponseBackup(enrollResp.BackupServerURL); err != nil {
-		return &enrollFailure{cat: catConfig, friendly: "enrollment refused: backup control-plane host not allowed", detail: err}
+		return &enrollFailure{cat: catConfig, friendly: i18n.Text("enrollment refused: backup control-plane host not allowed"), detail: err}
 	}
 
 	// Backup control-plane URL (#2288): enroll response wins; bootstrap value
@@ -1867,7 +1871,7 @@ func enrollWithConfig(cfg *config.Config, cfgFile, enrollmentKey, secret string)
 		cfg.MtlsCertExpires = enrollResp.Mtls.ExpiresAt
 		enrollLog.Info("mTLS certificate issued", "expiresAt", enrollResp.Mtls.ExpiresAt)
 		if !quietEnroll {
-			fmt.Printf("mTLS certificate issued (expires: %s)\n", enrollResp.Mtls.ExpiresAt)
+			fmt.Printf(i18n.Text("mTLS certificate issued (expires: %s)\n"), enrollResp.Mtls.ExpiresAt)
 		}
 	}
 
@@ -1904,6 +1908,11 @@ func enrollWithConfig(cfg *config.Config, cfgFile, enrollmentKey, secret string)
 		}
 	}
 
+	// Local reset before persisting enrollment: never retain another tenant's identity.
+	if err := helper.ResetPersistedBranding(config.ConfigDir()); err != nil {
+		return &enrollFailure{cat: catConfig, friendly: i18n.Text("could not clear previous helper branding"), detail: err}
+	}
+
 	if err := saveEnrollmentFn(cfg, cfgFile); err != nil {
 		return enrollSaveFailure(cfg, cfgFile, err)
 	}
@@ -1913,9 +1922,9 @@ func enrollWithConfig(cfg *config.Config, cfgFile, enrollmentKey, secret string)
 		"orgId", cfg.OrgID,
 		"siteId", cfg.SiteID)
 	if !quietEnroll {
-		fmt.Println("Enrollment successful!")
-		fmt.Printf("Agent ID: %s\n", cfg.AgentID)
-		fmt.Println("Configuration saved.")
+		fmt.Println(i18n.Text("Enrollment successful!"))
+		fmt.Printf(i18n.Text("Agent ID: %s\n"), cfg.AgentID)
+		fmt.Println(i18n.Text("Configuration saved."))
 	}
 
 	return nil
@@ -1975,41 +1984,41 @@ func checkStatus() {
 	cfg, err := config.Load(cfgFile)
 	if err != nil {
 		if isPermissionError(err) {
-			fmt.Println("Status: Unable to read configuration (permission denied)")
+			fmt.Println(i18n.Text("Status: Unable to read configuration (permission denied)"))
 			switch runtime.GOOS {
 			case "darwin":
-				fmt.Println("  The agent runs as a system service. Check status with:")
-				fmt.Println("    sudo breeze-agent status")
-				fmt.Println("    sudo launchctl list | grep breeze")
+				fmt.Println(i18n.Text("  The agent runs as a system service. Check status with:"))
+				fmt.Println(i18n.Text("    sudo breeze-agent status"))
+				fmt.Println(i18n.Text("    sudo launchctl list | grep breeze"))
 			case "linux":
-				fmt.Println("  The agent runs as a system service. Check status with:")
-				fmt.Println("    sudo breeze-agent status")
-				fmt.Println("    sudo systemctl status breeze-agent")
+				fmt.Println(i18n.Text("  The agent runs as a system service. Check status with:"))
+				fmt.Println(i18n.Text("    sudo breeze-agent status"))
+				fmt.Println(i18n.Text("    sudo systemctl status breeze-agent"))
 			default:
-				fmt.Println("  Try running with elevated privileges (e.g. sudo).")
+				fmt.Println(i18n.Text("  Try running with elevated privileges (e.g. sudo)."))
 			}
 			return
 		}
-		fmt.Println("Status: Not configured")
+		fmt.Println(i18n.Text("Status: Not configured"))
 		return
 	}
 
 	if cfg.AgentID == "" {
-		fmt.Println("Status: Not enrolled")
+		fmt.Println(i18n.Text("Status: Not enrolled"))
 		return
 	}
 
 	if isSystemServiceRunning() {
-		fmt.Println("Status: Enrolled & Active")
+		fmt.Println(i18n.Text("Status: Enrolled & Active"))
 	} else {
-		fmt.Println("Status: Enrolled (stopped)")
+		fmt.Println(i18n.Text("Status: Enrolled (stopped)"))
 	}
-	fmt.Printf("Version: %s\n", version)
-	fmt.Printf("Agent ID: %s\n", cfg.AgentID)
-	fmt.Printf("Server: %s\n", cfg.ServerURL)
-	fmt.Printf("Heartbeat Interval: %d seconds\n", cfg.HeartbeatIntervalSeconds)
-	fmt.Printf("Metrics Interval: %d seconds\n", cfg.MetricsIntervalSeconds)
-	fmt.Printf("Enabled Collectors: %v\n", cfg.EnabledCollectors)
+	fmt.Printf(i18n.Text("Version: %s\n"), version)
+	fmt.Printf(i18n.Text("Agent ID: %s\n"), cfg.AgentID)
+	fmt.Printf(i18n.Text("Server: %s\n"), cfg.ServerURL)
+	fmt.Printf(i18n.Text("Heartbeat Interval: %d seconds\n"), cfg.HeartbeatIntervalSeconds)
+	fmt.Printf(i18n.Text("Metrics Interval: %d seconds\n"), cfg.MetricsIntervalSeconds)
+	fmt.Printf(i18n.Text("Enabled Collectors: %v\n"), cfg.EnabledCollectors)
 }
 
 // runUninstallNotify posts the best-effort uninstall-intent signal (Task 6,

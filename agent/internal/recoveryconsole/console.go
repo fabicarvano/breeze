@@ -17,6 +17,7 @@ import (
 	"github.com/breeze-rmm/agent/internal/backup/layout"
 	"github.com/breeze-rmm/agent/internal/backup/providers"
 	"github.com/breeze-rmm/agent/internal/backup/rebuild"
+	"github.com/breeze-rmm/agent/internal/i18n"
 )
 
 // IO is every line-oriented interaction the console has with the operator.
@@ -197,7 +198,7 @@ func (c *Console) Run(ctx context.Context) error {
 			// it. Holding anyway is still right; a second recovery
 			// attempt is exactly as unsafe when the machine has
 			// failed to go down.
-			c.IO.Print("Power %s failed: %v — the machine may not shut down; power it off manually.\n", action, err)
+			c.IO.Print(i18n.Text("Power %s failed: %v — the machine may not shut down; power it off manually.\n"), action, err)
 		}
 		if c.Deps.Power != nil {
 			// Only hold when something really was asked to power the
@@ -235,7 +236,7 @@ func (c *Console) Run(ctx context.Context) error {
 	if bs.MinHelperVersion != "" && !versionAtLeast(c.Deps.Version, bs.MinHelperVersion) {
 		gateErr := fmt.Errorf("recovery media v%s is older than the server requires (v%s)", c.Deps.Version, bs.MinHelperVersion)
 		c.postProgress(ctx, server, token, bmr.ProgressUpdate{Status: "failed", Reason: "media_too_old: " + gateErr.Error()})
-		c.IO.Print("This recovery media (v%s) is older than the server requires (v%s); download the current ISO.\n", c.Deps.Version, bs.MinHelperVersion)
+		c.IO.Print(i18n.Text("This recovery media (v%s) is older than the server requires (v%s); download the current ISO.\n"), c.Deps.Version, bs.MinHelperVersion)
 		return gateErr
 	}
 
@@ -255,7 +256,7 @@ func (c *Console) Run(ctx context.Context) error {
 	if err != nil {
 		reason := "snapshot integrity expectation refused: " + err.Error()
 		c.postProgress(ctx, server, token, bmr.ProgressUpdate{Status: "refused", Reason: reason})
-		c.IO.Print("Recovery cannot proceed: %s\n", reason)
+		c.IO.Print(i18n.Text("Recovery cannot proceed: %s\n"), reason)
 		return err
 	}
 
@@ -282,7 +283,7 @@ func (c *Console) Run(ctx context.Context) error {
 			var scopeErr *bmr.ScopeRefusalError
 			if errors.As(err, &scopeErr) {
 				c.postProgress(ctx, server, token, bmr.ProgressUpdate{Status: "refused", Reason: scopeErr.Error()})
-				c.IO.Print("Recovery cannot proceed: %s\n", scopeErr.Error())
+				c.IO.Print(i18n.Text("Recovery cannot proceed: %s\n"), scopeErr.Error())
 				action, err := c.offerFailureOptions(ci)
 				if err != nil {
 					return err
@@ -328,8 +329,8 @@ func (c *Console) Run(ctx context.Context) error {
 			// posted below only when they decline. The serial/ERASE
 			// confirmation still follows the re-run; CI never auto-overwrites.
 			if plan != nil && plan.RefusalCode == rebuild.RefusalCodeDiskHasWindows && !baseOpts.ForceDisk && !ci && !refusedPosted {
-				c.IO.Print("Disk %s already contains a Windows installation. Everything on it will be erased.\n", disk.Path)
-				line, err := c.IO.ReadLine("Type OVERWRITE to erase it, or press Enter for other options: ")
+				c.IO.Print(i18n.Text("Disk %s already contains a Windows installation. Everything on it will be erased.\n"), disk.Path)
+				line, err := c.IO.ReadLine(i18n.Text("Type OVERWRITE to erase it, or press Enter for other options: "))
 				if err != nil {
 					return err
 				}
@@ -343,10 +344,10 @@ func (c *Console) Run(ctx context.Context) error {
 				refusedPosted = statusForFailure(plan) == "refused"
 			}
 			if plan != nil && plan.RefusalCode == rebuild.RefusalCodeDiskHasWindows {
-				c.IO.Print("Recovery cannot proceed: disk %s already contains a Windows installation. "+
-					"This recovery is now marked refused; to overwrite the disk, start a new recovery and enter its new recovery code.\n", disk.Path)
+				c.IO.Print(i18n.Text("Recovery cannot proceed: disk %s already contains a Windows installation. ")+
+					i18n.Text("This recovery is now marked refused; to overwrite the disk, start a new recovery and enter its new recovery code.\n"), disk.Path)
 			} else {
-				c.IO.Print("Recovery cannot proceed: %s\n", reason)
+				c.IO.Print(i18n.Text("Recovery cannot proceed: %s\n"), reason)
 			}
 			action, err := c.offerFailureOptions(ci)
 			if err != nil {
@@ -384,14 +385,14 @@ func (c *Console) Run(ctx context.Context) error {
 			if total > 0 {
 				line += fmt.Sprintf(" (%d/%d)", cur, total)
 			}
-			c.IO.Print("%s\n", line)
+			c.IO.Print(i18n.Text("%s\n"), line)
 		}
 
 		res, runErr := c.Deps.Rebuild(ctx, runOpts)
 		if runErr != nil || res == nil || res.Status != "completed" {
 			reason := refusalReason(res, runErr)
 			c.postProgress(ctx, server, token, bmr.ProgressUpdate{Status: statusForFailure(res), Reason: reason})
-			c.IO.Print("Recovery failed: %s\n", reason)
+			c.IO.Print(i18n.Text("Recovery failed: %s\n"), reason)
 			action, err := c.offerFailureOptions(ci)
 			if err != nil {
 				return err
@@ -423,7 +424,7 @@ func (c *Console) Run(ctx context.Context) error {
 // production's own after=poweroff override exists to make an operator's
 // explicit choice deterministic too.
 func (c *Console) rebootOrPoweroff(ci bool, after string) (string, error) {
-	c.IO.Print("Restored. Rebooting in 10 s (press any key to stay).\n")
+	c.IO.Print("%s", i18n.Text("Restored. Rebooting in 10 s (press any key to stay).\n"))
 
 	if ci || after == "poweroff" {
 		if after == "poweroff" {
@@ -436,9 +437,9 @@ func (c *Console) rebootOrPoweroff(ci bool, after string) (string, error) {
 		return "reboot", nil
 	}
 
-	c.IO.Print("Reboot cancelled. Press [r]eboot or [p]oweroff when ready.\n")
+	c.IO.Print("%s", i18n.Text("Reboot cancelled. Press [r]eboot or [p]oweroff when ready.\n"))
 	for {
-		choice, err := c.IO.ReadLine("> ")
+		choice, err := c.IO.ReadLine(i18n.Text("> "))
 		if err != nil {
 			return "", err
 		}
@@ -478,7 +479,7 @@ func (c *Console) postProgress(ctx context.Context, server, token string, u bmr.
 		return
 	}
 	if err := c.Deps.Progress(ctx, server, token, u); err != nil {
-		c.IO.Print("progress %s not recorded: %v\n", u.Status, err)
+		c.IO.Print(i18n.Text("progress %s not recorded: %v\n"), u.Status, err)
 	}
 }
 
@@ -516,20 +517,20 @@ func (c *Console) promptServer(ci bool, answers Answers) (string, error) {
 	cmdlineDefault := strings.TrimSpace(answers.Server)
 	if trustedDefault != "" && cmdlineDefault != "" && trustedDefault != cmdlineDefault {
 		c.IO.Print(
-			"WARNING: the boot cmdline suggests a different server (%s) than the one baked into this recovery media (%s). "+
-				"Using the media's own server unless you type a different URL below.\n",
+			i18n.Text("WARNING: the boot cmdline suggests a different server (%s) than the one baked into this recovery media (%s). ")+
+				i18n.Text("Using the media's own server unless you type a different URL below.\n"),
 			cmdlineDefault, trustedDefault,
 		)
 	}
 	for {
 		def := trustedDefault
-		prompt := "Breeze server URL: "
+		prompt := i18n.Text("Breeze server URL: ")
 		switch {
 		case def != "":
 			// A build-time (or --server flag) default is a value this
 			// binary/media was configured with, not something read off an
 			// unauthenticated kernel cmdline — safe to pre-fill silently.
-			prompt = fmt.Sprintf("Breeze server URL [%s]: ", def)
+			prompt = i18n.Format("Breeze server URL [%s]: ", def)
 		case cmdlineDefault != "":
 			// No trusted default exists, so the only candidate is the
 			// unauthenticated breeze.server= boot cmdline value. Pre-fill
@@ -538,7 +539,7 @@ func (c *Console) promptServer(ci bool, answers Answers) (string, error) {
 			// unauthenticated boot configuration, not a value this media
 			// was built or launched with.
 			def = cmdlineDefault
-			prompt = fmt.Sprintf("Breeze server URL [%s — from boot cmdline, unverified; confirm or type a different URL]: ", def)
+			prompt = i18n.Format("Breeze server URL [%s — from boot cmdline, unverified; confirm or type a different URL]: ", def)
 		}
 		line, err := c.IO.ReadLine(prompt)
 		if err != nil {
@@ -549,11 +550,11 @@ func (c *Console) promptServer(ci bool, answers Answers) (string, error) {
 			line = def
 		}
 		if line == "" {
-			c.IO.Print("A server URL is required.\n")
+			c.IO.Print("%s", i18n.Text("A server URL is required.\n"))
 			continue
 		}
 		if !strings.HasPrefix(line, "https://") {
-			c.IO.Print("Server URL must start with https://.\n")
+			c.IO.Print("%s", i18n.Text("Server URL must start with https://.\n"))
 			continue
 		}
 		return line, nil
@@ -612,13 +613,13 @@ func (c *Console) promptCodeAndExchange(ctx context.Context, ci bool, answers An
 
 	serverErrors := 0
 	for {
-		code, err := c.IO.ReadLine("Recovery code: ")
+		code, err := c.IO.ReadLine(i18n.Text("Recovery code: "))
 		if err != nil {
 			return "", nil, err
 		}
 		code = strings.TrimSpace(code)
 		if code == "" {
-			c.IO.Print("A recovery code is required.\n")
+			c.IO.Print("%s", i18n.Text("A recovery code is required.\n"))
 			continue
 		}
 		token, bs, exErr := c.exchangeWithNegotiation(ctx, code, server)
@@ -635,11 +636,11 @@ func (c *Console) promptCodeAndExchange(ctx context.Context, ci bool, answers An
 		case failureServerUnreachable:
 			var su *bmr.ServerUnreachableError
 			errors.As(exErr, &su)
-			c.IO.Print("Could not reach %s: %s.\n", su.Host, unreachableReason(exErr))
+			c.IO.Print(i18n.Text("Could not reach %s: %s.\n"), su.Host, unreachableReason(exErr))
 			if failedBeforeSending(exErr) {
-				c.IO.Print("The recovery code was not sent and this did not count as a failed attempt. Check the server URL and the network connection.\n")
+				c.IO.Print("%s", i18n.Text("The recovery code was not sent and this did not count as a failed attempt. Check the server URL and the network connection.\n"))
 			} else {
-				c.IO.Print(codeMayBeUsedNotice)
+				c.IO.Print("%s", i18n.Text(codeMayBeUsedNotice))
 			}
 			return "", nil, errReenterServer
 		case failureNotBreezeServer:
@@ -649,11 +650,11 @@ func (c *Console) promptCodeAndExchange(ctx context.Context, ci bool, answers An
 				// A proxy error page: the URL may be right and the Breeze
 				// server behind it down, restarting, or slow (a 504 can
 				// arrive after the server already claimed the code).
-				c.IO.Print("%s returned a gateway/server error page (HTTP %d%s): the Breeze server may be down or restarting, or the URL may be wrong.\n", ue.Host, ue.StatusCode, contentTypeSuffix(ue.ContentType))
-				c.IO.Print(codeMayBeUsedNotice)
+				c.IO.Print(i18n.Text("%s returned a gateway/server error page (HTTP %d%s): the Breeze server may be down or restarting, or the URL may be wrong.\n"), ue.Host, ue.StatusCode, contentTypeSuffix(ue.ContentType))
+				c.IO.Print("%s", i18n.Text(codeMayBeUsedNotice))
 			} else {
-				c.IO.Print("%s answered, but not as a Breeze recovery server (HTTP %d%s).\n", ue.Host, ue.StatusCode, contentTypeSuffix(ue.ContentType))
-				c.IO.Print("The recovery code was not used and this did not count as a failed attempt. Check the server URL.\n")
+				c.IO.Print(i18n.Text("%s answered, but not as a Breeze recovery server (HTTP %d%s).\n"), ue.Host, ue.StatusCode, contentTypeSuffix(ue.ContentType))
+				c.IO.Print("%s", i18n.Text("The recovery code was not used and this did not count as a failed attempt. Check the server URL.\n"))
 			}
 			return "", nil, errReenterServer
 		case failureServerError:
@@ -666,16 +667,16 @@ func (c *Console) promptCodeAndExchange(ctx context.Context, ci bool, answers An
 				return "", nil, exErr
 			}
 			serverErrors++
-			c.IO.Print("The server could not check that code: %v\n", exErr)
+			c.IO.Print(i18n.Text("The server could not check that code: %v\n"), exErr)
 			if serverErrors >= maxCodeAttempts {
-				c.IO.Print("This did not count as a failed attempt. The server keeps failing; check the server URL, or try again later.\n")
+				c.IO.Print("%s", i18n.Text("This did not count as a failed attempt. The server keeps failing; check the server URL, or try again later.\n"))
 				return "", nil, errReenterServer
 			}
-			c.IO.Print("This did not count as a failed attempt. Try the code again.\n")
+			c.IO.Print("%s", i18n.Text("This did not count as a failed attempt. Try the code again.\n"))
 			continue
 		}
 		c.codeRejections++
-		c.IO.Print("That code did not work: %v\n", exErr)
+		c.IO.Print(i18n.Text("That code did not work: %v\n"), exErr)
 		if c.codeRejections >= maxCodeAttempts {
 			return "", nil, fmt.Errorf("too many invalid recovery codes: %w", exErr)
 		}
@@ -838,7 +839,7 @@ func (c *Console) exchangeWithNegotiation(ctx context.Context, code, server stri
 		}
 		var negErr *bmr.RecoveryNegotiationError
 		if errors.As(err, &negErr) {
-			c.IO.Print("%s\n", negErr.Message)
+			c.IO.Print(i18n.Text("%s\n"), negErr.Message)
 			if negErr.Code == "snapshot_index_pending" {
 				if c.waitAndRetryPending(ctx, negErr.RetryAfterSeconds) {
 					continue
@@ -909,17 +910,17 @@ func (c *Console) chooseDisk(ctx context.Context, ci bool, answers Answers) (Dis
 	}
 
 	for {
-		c.IO.Print("Multiple candidate disks found:\n")
+		c.IO.Print("%s", i18n.Text("Multiple candidate disks found:\n"))
 		for i, d := range candidates {
-			c.IO.Print("  %d) %s  %s  %s  %s\n", i+1, d.Path, d.Model, d.Serial, humanizeBytes(d.SizeBytes))
+			c.IO.Print(i18n.Text("  %d) %s  %s  %s  %s\n"), i+1, d.Path, d.Model, d.Serial, humanizeBytes(d.SizeBytes))
 		}
-		line, err := c.IO.ReadLine("Select target disk number: ")
+		line, err := c.IO.ReadLine(i18n.Text("Select target disk number: "))
 		if err != nil {
 			return DiskChoice{}, err
 		}
 		idx, convErr := strconv.Atoi(strings.TrimSpace(line))
 		if convErr != nil || idx < 1 || idx > len(candidates) {
-			c.IO.Print("Invalid selection.\n")
+			c.IO.Print("%s", i18n.Text("Invalid selection.\n"))
 			continue
 		}
 		return candidates[idx-1], nil
@@ -936,9 +937,9 @@ func (c *Console) confirmDisk(ctx context.Context, ci bool, answers Answers, dis
 		return answers.Confirm == expect, nil
 	}
 
-	prompt := fmt.Sprintf("Type the disk serial (%s) to confirm, or 'cancel': ", expect)
+	prompt := i18n.Format("Type the disk serial (%s) to confirm, or 'cancel': ", expect)
 	if disk.Serial == "" {
-		prompt = "This disk reports no serial. Type ERASE to confirm, or 'cancel': "
+		prompt = i18n.Text("This disk reports no serial. Type ERASE to confirm, or 'cancel': ")
 	}
 	for {
 		line, err := c.IO.ReadLine(prompt)
@@ -952,7 +953,7 @@ func (c *Console) confirmDisk(ctx context.Context, ci bool, answers Answers, dis
 		if line == expect {
 			return true, nil
 		}
-		c.IO.Print("That does not match. Try again.\n")
+		c.IO.Print("%s", i18n.Text("That does not match. Try again.\n"))
 	}
 }
 
@@ -968,7 +969,7 @@ func (c *Console) offerFailureOptions(ci bool) (string, error) {
 		return "poweroff", nil
 	}
 	for {
-		line, err := c.IO.ReadLine("[r]etry  [s]hell  [p]oweroff: ")
+		line, err := c.IO.ReadLine(i18n.Text("[r]etry  [s]hell  [p]oweroff: "))
 		if err != nil {
 			return "", err
 		}
@@ -979,24 +980,24 @@ func (c *Console) offerFailureOptions(ci bool) (string, error) {
 			if c.Deps.Shell != nil {
 				_ = c.Deps.Shell()
 			} else {
-				c.IO.Print("No shell available on this build.\n")
+				c.IO.Print("%s", i18n.Text("No shell available on this build.\n"))
 			}
 		case "p", "poweroff":
 			return "poweroff", nil
 		default:
-			c.IO.Print("Please choose r, s, or p.\n")
+			c.IO.Print("%s", i18n.Text("Please choose r, s, or p.\n"))
 		}
 	}
 }
 
 func (c *Console) printPlan(disk DiskChoice, plan *rebuild.Result) {
-	c.IO.Print("Target disk: %s  %s  serial %s  %s\n", disk.Path, disk.Model, disk.Serial, humanizeBytes(disk.SizeBytes))
+	c.IO.Print(i18n.Text("Target disk: %s  %s  serial %s  %s\n"), disk.Path, disk.Model, disk.Serial, humanizeBytes(disk.SizeBytes))
 	if plan == nil || plan.Plan == nil {
 		return
 	}
-	c.IO.Print("Source disk: %s  %s\n", plan.Plan.SourceDisk, humanizeBytes(plan.Plan.SourceSizeBytes))
+	c.IO.Print(i18n.Text("Source disk: %s  %s\n"), plan.Plan.SourceDisk, humanizeBytes(plan.Plan.SourceSizeBytes))
 	for _, p := range plan.Plan.Partitions {
-		c.IO.Print("  #%d  %-8s  %-8s  %s\n", p.Number, p.Role, p.Filesystem, humanizeBytes(p.SizeBytes))
+		c.IO.Print(i18n.Text("  #%d  %-8s  %-8s  %s\n"), p.Number, p.Role, p.Filesystem, humanizeBytes(p.SizeBytes))
 	}
 }
 

@@ -1,3 +1,4 @@
+import { hasHelperBranding, helperBrandingAllowedAt, HELPER_BRANDING_LEVEL_ERROR, HelperBrandingLevelError } from '../../services/helperBrandingPolicy';
 import { Hono } from 'hono';
 import { zValidator } from '../../lib/validation';
 import type { AuthContext } from '../../middleware/auth';
@@ -145,11 +146,17 @@ assignmentRoutes.post(
       if (!gate.allowed) return c.json(gate.body, 403);
     }
 
+    const helperLink = policy.featureLinks?.find((link: { featureType: string }) => link.featureType === 'helper')
+      ?? policy.parentPolicy?.featureLinks?.find((link: { featureType: string }) => link.featureType === 'helper');
+    if (!helperBrandingAllowedAt(data.level) && hasHelperBranding(helperLink?.inlineSettings))
+      return c.json({ error: HELPER_BRANDING_LEVEL_ERROR }, 400);
+
     // assignPolicy returns null (instead of throwing) on a duplicate — see the
     // comment on its onConflictDoNothing insert in configurationPolicy.ts for
     // why the raised-violation catch pattern doesn't work inside this route's
     // withDbAccessContext transaction.
-    const assignment = await assignPolicy(
+    let assignment;
+    try { assignment = await assignPolicy(
       id,
       data.level,
       targetId,
@@ -157,7 +164,8 @@ assignmentRoutes.post(
       auth.user.id,
       data.roleFilter,
       data.osFilter
-    );
+    ); }
+    catch (error) { if (error instanceof HelperBrandingLevelError) return c.json({ error: error.message }, 400); throw error; }
 
     if (!assignment) {
       return c.json({ error: 'This policy is already assigned to this target at this level' }, 409);

@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/breeze-rmm/agent/internal/i18n"
 	"github.com/breeze-rmm/agent/internal/patching/linuxsession"
 )
 
@@ -239,11 +240,11 @@ func zenityPromptArgs(title, body string, actions []string, timeout time.Duratio
 		"--no-markup",
 	}
 	if len(actions) > 0 {
-		args = append(args, "--ok-label", sanitizeDialogText(actions[0]))
+		args = append(args, "--ok-label", sanitizeDialogText(i18n.ActionLabel(actions[0])))
 	}
-	args = append(args, "--cancel-label", zenityDismissLabel)
+	args = append(args, "--cancel-label", i18n.Text(zenityDismissLabel))
 	if len(actions) > 1 {
-		args = append(args, "--extra-button", sanitizeDialogText(actions[1]))
+		args = append(args, "--extra-button", sanitizeDialogText(i18n.ActionLabel(actions[1])))
 	}
 	return append(args, "--timeout="+strconv.Itoa(dialogTimeoutSeconds(timeout)))
 }
@@ -259,7 +260,7 @@ func recognisedExtraButton(stdout string, actions []string) string {
 	if len(actions) < 2 {
 		return ""
 	}
-	if printed := strings.TrimSpace(stdout); printed == actions[1] {
+	if printed := strings.TrimSpace(stdout); printed == i18n.ActionLabel(actions[1]) {
 		return actions[1]
 	}
 	return ""

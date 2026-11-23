@@ -15,6 +15,7 @@ import (
 
 	"github.com/breeze-rmm/agent/internal/config"
 	"github.com/breeze-rmm/agent/internal/hostpolicy"
+	"github.com/breeze-rmm/agent/internal/i18n"
 	"github.com/breeze-rmm/agent/internal/logging"
 	"github.com/breeze-rmm/agent/pkg/api"
 )
@@ -276,7 +277,7 @@ func runBootstrap() {
 	if cfg.AgentID != "" {
 		bsLog.Info("agent already enrolled; skipping bootstrap", "agent_id", cfg.AgentID)
 		if !quietEnroll {
-			fmt.Println("Agent already enrolled; skipping bootstrap enrollment.")
+			fmt.Println(i18n.Text("Agent already enrolled; skipping bootstrap enrollment."))
 		}
 		return // exit 0 — upgrade over an enrolled agent must never burn the token
 	}
@@ -298,7 +299,7 @@ func runBootstrap() {
 		bsLog.Warn("no bootstrap token present; skipping enrollment (agent will idle until enrolled)")
 		reportBootstrapUnenrolled(unenrolledInstallNotice)
 		if !quietEnroll {
-			fmt.Println("No enrollment token found; install will complete unenrolled.")
+			fmt.Println(i18n.Text("No enrollment token found; install will complete unenrolled."))
 		}
 		return // exit 0 — soft
 	}

@@ -89,6 +89,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/breeze-rmm/agent/internal/i18n"
 	"github.com/breeze-rmm/agent/internal/ipc"
 	"github.com/breeze-rmm/agent/internal/remote/desktop"
 )
@@ -379,8 +380,8 @@ func handleFullDiskAccessGuidance(status *ipc.TCCStatus, promptFile string) {
 // now granted, shown once on the transition to fully-granted.
 func showTCCCompleteNotification() {
 	showNotificationOS(ipc.NotifyRequest{
-		Title: "Breeze: Setup Complete",
-		Body:  "All required permissions are granted — Breeze Agent is ready.",
+		Title: i18n.Text("Breeze: Setup Complete"),
+		Body:  i18n.Text("All required permissions are granted — Breeze Agent is ready."),
 	})
 }
 
@@ -486,14 +487,14 @@ func showTCCDialog(missing []string) {
 
 	var msg, script string
 	if fdaMissing {
-		msg = "Breeze Agent needs Full Disk Access to function properly.\n\nPlease grant it in System Settings > Privacy & Security > Full Disk Access.\n\nmacOS will prompt separately for Screen Recording and Accessibility — you can also grant them in the same Privacy & Security pane."
+		msg = i18n.Text("Breeze Agent needs Full Disk Access to function properly.\n\nPlease grant it in System Settings > Privacy & Security > Full Disk Access.\n\nmacOS will prompt separately for Screen Recording and Accessibility — you can also grant them in the same Privacy & Security pane.")
 		script = fmt.Sprintf(
 			`display dialog "%s" `+
 				`buttons {"Later", "Open Settings"} default button "Open Settings" with title "Breeze: Permissions Required" giving up after 60`,
 			escapeAppleScript(msg),
 		)
 	} else {
-		msg = "Breeze Agent needs Screen Recording and Accessibility.\n\nmacOS should prompt for these — if the prompts were dismissed, grant them in System Settings > Privacy & Security."
+		msg = i18n.Text("Breeze Agent needs Screen Recording and Accessibility.\n\nmacOS should prompt for these — if the prompts were dismissed, grant them in System Settings > Privacy & Security.")
 		script = fmt.Sprintf(
 			`display dialog "%s" `+
 				`buttons {"OK"} default button "OK" with title "Breeze: Permissions Required" giving up after 60`,
@@ -534,7 +535,7 @@ func showTCCNotification(missing []string) {
 	}
 
 	req := ipc.NotifyRequest{
-		Title: "Breeze: Permission Required",
+		Title: i18n.Text("Breeze: Permission Required"),
 		Body:  body,
 	}
 	showNotificationOS(req)

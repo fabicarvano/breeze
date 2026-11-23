@@ -703,7 +703,44 @@
         "showOpenPortal": "showOpenPortal",
         "showDeviceInfo": "showDeviceInfo",
         "showRequestSupport": "showRequestSupport",
-        "portalUrl": "portalUrl"
+        "portalUrl": "portalUrl",
+        "branding": {
+          "title": "Identidade visual do Helper",
+          "help": "Campos em branco herdam o valor do parceiro ou o padrão Breeze. Os textos são exibidos como digitados em todos os idiomas.",
+          "unavailable": "A identidade visual está disponível apenas em atribuições de parceiro e organização. Políticas de site, grupo e dispositivo configuram somente opções operacionais.",
+          "previewContext": "Visualizar herança para",
+          "inherited": "Herdado: {{value}} ({{source}})",
+          "loading": "Carregando a herança do servidor…",
+          "invalidText": "Use texto simples sem caracteres de controle, com até {{limit}} caracteres.",
+          "invalidColor": "Use uma cor hexadecimal com seis dígitos, como #2563EB.",
+          "fields": {
+            "displayName": "Nome de exibição",
+            "companyName": "Nome da empresa",
+            "welcomeTitle": "Título de boas-vindas",
+            "welcomeMessage": "Mensagem de boas-vindas",
+            "supportLabel": "Rótulo de suporte",
+            "portalLabel": "Rótulo do portal",
+            "primaryColor": "Cor principal",
+            "accentColor": "Cor de destaque"
+          },
+          "sources": {
+            "default": "Padrão Breeze",
+            "partner": "Política do parceiro",
+            "organization": "Política da organização"
+          },
+          "defaults": {
+            "displayName": "Breeze Helper",
+            "companyName": "Sem nome de empresa",
+            "welcomeTitle": "Bem-vindo ao Breeze Helper",
+            "welcomeMessage": "Pergunte-me qualquer coisa sobre seu computador.",
+            "supportLabel": "Solicitar suporte",
+            "portalLabel": "Abrir portal Breeze",
+            "primaryColor": "Cor do tema Breeze",
+            "accentColor": "Cor do tema Breeze"
+          },
+          "noAssignments": "Atribua esta política a um parceiro ou organização para visualizar os valores herdados.",
+          "selfPartnerDefault": "Esta política fornece o padrão do parceiro e a substituição da organização. A edição altera os dois níveis; um campo em branco usa o padrão Breeze."
+        }
       },
       "inlineEntityPicker": {
         "search": "Pesquisar...",

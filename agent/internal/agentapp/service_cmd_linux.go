@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/breeze-rmm/agent/internal/config"
+	"github.com/breeze-rmm/agent/internal/i18n"
 	"github.com/spf13/cobra"
 )
 
@@ -47,7 +48,7 @@ WantedBy=default.target
 
 var serviceCmd = &cobra.Command{
 	Use:   "service",
-	Short: "Manage the Breeze Agent system service (systemd)",
+	Short: i18n.Text("Manage the Breeze Agent system service (systemd)"),
 }
 
 var withUserHelper bool
@@ -120,15 +121,15 @@ func init() {
 	serviceCmd.AddCommand(serviceStopCmd)
 	serviceCmd.AddCommand(serviceStatusCmd)
 	serviceCmd.AddCommand(serviceReconcileUnitCmd)
-	serviceInstallCmd.Flags().BoolVar(&withUserHelper, "with-user-helper", false, "Also install the per-user desktop helper systemd unit")
-	serviceInstallCmd.Flags().BoolVar(&noWatchdog, "no-watchdog", false, "Skip automatic watchdog installation")
+	serviceInstallCmd.Flags().BoolVar(&withUserHelper, "with-user-helper", false, i18n.Text("Also install the per-user desktop helper systemd unit"))
+	serviceInstallCmd.Flags().BoolVar(&noWatchdog, "no-watchdog", false, i18n.Text("Skip automatic watchdog installation"))
 	// A failed start returns an error from RunE; usage text would bury it.
 	serviceInstallCmd.SilenceUsage = true
 }
 
 var serviceInstallCmd = &cobra.Command{
 	Use:   "install",
-	Short: "Install the agent as a systemd service",
+	Short: i18n.Text("Install the agent as a systemd service"),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if os.Geteuid() != 0 {
 			return fmt.Errorf("must run as root (sudo breeze-agent service install)")
@@ -160,7 +161,7 @@ var serviceInstallCmd = &cobra.Command{
 			if stopErr := exec.Command("systemctl", "stop", linuxServiceName).Run(); stopErr != nil {
 				fmt.Fprintf(os.Stderr, "Warning: failed to stop existing service: %v\n", stopErr)
 			} else {
-				fmt.Println("Stopped existing Breeze Agent service.")
+				fmt.Println(i18n.Text("Stopped existing Breeze Agent service."))
 			}
 		}
 
@@ -182,14 +183,14 @@ var serviceInstallCmd = &cobra.Command{
 			if err := os.WriteFile(linuxBinaryPath, data, 0755); err != nil {
 				return fmt.Errorf("failed to copy binary to %s: %w", linuxBinaryPath, err)
 			}
-			fmt.Printf("Binary installed to %s\n", linuxBinaryPath)
+			fmt.Printf(i18n.Text("Binary installed to %s\n"), linuxBinaryPath)
 		}
 
 		// Write systemd unit file
 		if err := os.WriteFile(linuxUnitDst, []byte(currentLinuxUnit()), 0644); err != nil {
 			return fmt.Errorf("failed to write unit file: %w", err)
 		}
-		fmt.Printf("Systemd unit installed to %s\n", linuxUnitDst)
+		fmt.Printf(i18n.Text("Systemd unit installed to %s\n"), linuxUnitDst)
 
 		// Optionally install the per-user desktop helper unit
 		if withUserHelper {
@@ -197,7 +198,7 @@ var serviceInstallCmd = &cobra.Command{
 				if err := os.WriteFile(linuxUserUnitDst, []byte(linuxUserUnit), 0644); err != nil {
 					fmt.Fprintf(os.Stderr, "Warning: failed to write user-helper unit: %v\n", err)
 				} else {
-					fmt.Printf("User helper unit installed to %s\n", linuxUserUnitDst)
+					fmt.Printf(i18n.Text("User helper unit installed to %s\n"), linuxUserUnitDst)
 				}
 			}
 		}
@@ -211,7 +212,7 @@ var serviceInstallCmd = &cobra.Command{
 			if createErr := exec.Command("groupadd", "--system", "breeze").Run(); createErr != nil {
 				fmt.Fprintf(os.Stderr, "Warning: failed to create 'breeze' group: %v\n", createErr)
 			} else {
-				fmt.Println("Created 'breeze' group for IPC socket access.")
+				fmt.Println(i18n.Text("Created 'breeze' group for IPC socket access."))
 			}
 		}
 
@@ -232,12 +233,12 @@ var serviceInstallCmd = &cobra.Command{
 		// upgrade path the docs describe (#5252).
 		plan := planServiceStart(wasRunning, enrolled)
 		started, startErr := applySystemdUnit(execCommandRunner, linuxServiceName, plan)
-		fmt.Printf("Systemd unit reloaded and enabled (%s).\n", linuxUnitDst)
+		fmt.Printf(i18n.Text("Systemd unit reloaded and enabled (%s).\n"), linuxUnitDst)
 
 		fmt.Println()
 		switch {
 		case started:
-			fmt.Printf("Breeze Agent service installed, enabled and started (%s).\n", plan.Reason)
+			fmt.Printf(i18n.Text("Breeze Agent service installed, enabled and started (%s).\n"), plan.Reason)
 		case startErr != nil:
 			fmt.Fprintf(os.Stderr,
 				"ERROR: the Breeze Agent service was stopped for this install and could NOT be started again: %v\n"+
@@ -246,7 +247,7 @@ var serviceInstallCmd = &cobra.Command{
 					"         sudo journalctl -u breeze-agent -n 100 --no-pager\n",
 				startErr)
 		default:
-			fmt.Println("Breeze Agent service installed and enabled (not started: " + plan.Reason + ").")
+			fmt.Println(i18n.Text("Breeze Agent service installed and enabled (not started: ") + plan.Reason + ").")
 		}
 
 		if started {
@@ -257,23 +258,23 @@ var serviceInstallCmd = &cobra.Command{
 			statusCmd.Stderr = os.Stderr
 			statusCmd.Run() // best-effort; ignore error
 
-			fmt.Println("\nHelpful Commands:")
-			fmt.Println("  Logs:    journalctl -u breeze-agent -f")
-			fmt.Println("  Status:  sudo breeze-agent service status")
-			fmt.Println("  Restart: sudo systemctl restart breeze-agent")
+			fmt.Println(i18n.Text("\nHelpful Commands:"))
+			fmt.Println(i18n.Text("  Logs:    journalctl -u breeze-agent -f"))
+			fmt.Println(i18n.Text("  Status:  sudo breeze-agent service status"))
+			fmt.Println(i18n.Text("  Restart: sudo systemctl restart breeze-agent"))
 		} else if enrolled {
 			fmt.Println()
-			fmt.Println("Next steps:")
-			fmt.Printf("  1. Start:   sudo breeze-agent service start\n")
-			fmt.Printf("  2. Status:  sudo breeze-agent service status\n")
-			fmt.Println("  3. Logs:    journalctl -u breeze-agent -f")
+			fmt.Println(i18n.Text("Next steps:"))
+			fmt.Print(i18n.Text("  1. Start:   sudo breeze-agent service start\n"))
+			fmt.Print(i18n.Text("  2. Status:  sudo breeze-agent service status\n"))
+			fmt.Println(i18n.Text("  3. Logs:    journalctl -u breeze-agent -f"))
 		} else {
 			fmt.Println()
-			fmt.Println("Next steps:")
-			fmt.Printf("  1. Enroll:  sudo breeze-agent enroll <key> --server https://your-server\n")
-			fmt.Printf("  2. Start:   sudo breeze-agent service start\n")
-			fmt.Printf("  3. Status:  sudo breeze-agent service status\n")
-			fmt.Println("  4. Logs:    journalctl -u breeze-agent -f")
+			fmt.Println(i18n.Text("Next steps:"))
+			fmt.Print(i18n.Text("  1. Enroll:  sudo breeze-agent enroll <key> --server https://your-server\n"))
+			fmt.Print(i18n.Text("  2. Start:   sudo breeze-agent service start\n"))
+			fmt.Print(i18n.Text("  3. Status:  sudo breeze-agent service status\n"))
+			fmt.Println(i18n.Text("  4. Logs:    journalctl -u breeze-agent -f"))
 		}
 
 		if !noWatchdog {
@@ -315,7 +316,7 @@ var serviceInstallCmd = &cobra.Command{
 
 var serviceUninstallCmd = &cobra.Command{
 	Use:   "uninstall",
-	Short: "Uninstall the agent systemd service",
+	Short: i18n.Text("Uninstall the agent systemd service"),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if os.Geteuid() != 0 {
 			return fmt.Errorf("must run as root (sudo breeze-agent service uninstall)")
@@ -351,9 +352,9 @@ var serviceUninstallCmd = &cobra.Command{
 			fmt.Fprintf(os.Stderr, "Warning: failed to remove %s: %v\n", linuxBinaryPath, err)
 		}
 
-		fmt.Println("Breeze Agent service uninstalled.")
-		fmt.Printf("Config at %s was preserved.\n", linuxConfigDir)
-		fmt.Printf("To remove config: sudo rm -rf %s\n", linuxConfigDir)
+		fmt.Println(i18n.Text("Breeze Agent service uninstalled."))
+		fmt.Printf(i18n.Text("Config at %s was preserved.\n"), linuxConfigDir)
+		fmt.Printf(i18n.Text("To remove config: sudo rm -rf %s\n"), linuxConfigDir)
 		return nil
 	},
 }
@@ -375,7 +376,7 @@ func uninstallLinuxWatchdog() {
 
 var serviceStartCmd = &cobra.Command{
 	Use:   "start",
-	Short: "Start the agent service",
+	Short: i18n.Text("Start the agent service"),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if os.Geteuid() != 0 {
 			return fmt.Errorf("must run as root (sudo breeze-agent service start)")
@@ -398,15 +399,15 @@ var serviceStartCmd = &cobra.Command{
 			return fmt.Errorf("failed to start service: %s", strings.TrimSpace(string(out)))
 		}
 
-		fmt.Println("Breeze Agent service started and enabled for auto-start.")
-		fmt.Println("Logs: journalctl -u breeze-agent -f")
+		fmt.Println(i18n.Text("Breeze Agent service started and enabled for auto-start."))
+		fmt.Println(i18n.Text("Logs: journalctl -u breeze-agent -f"))
 		return nil
 	},
 }
 
 var serviceStopCmd = &cobra.Command{
 	Use:   "stop",
-	Short: "Stop the agent service",
+	Short: i18n.Text("Stop the agent service"),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if os.Geteuid() != 0 {
 			return fmt.Errorf("must run as root (sudo breeze-agent service stop)")
@@ -417,17 +418,17 @@ var serviceStopCmd = &cobra.Command{
 			return fmt.Errorf("failed to stop service: %s", strings.TrimSpace(string(out)))
 		}
 
-		fmt.Println("Breeze Agent service stopped.")
+		fmt.Println(i18n.Text("Breeze Agent service stopped."))
 		return nil
 	},
 }
 
 var serviceStatusCmd = &cobra.Command{
 	Use:   "status",
-	Short: "Show agent service status",
+	Short: i18n.Text("Show agent service status"),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if _, err := os.Stat(linuxUnitDst); os.IsNotExist(err) {
-			fmt.Println("Service: not installed")
+			fmt.Println(i18n.Text("Service: not installed"))
 			return nil
 		}
 
@@ -447,7 +448,7 @@ var serviceStatusCmd = &cobra.Command{
 
 var serviceReconcileUnitCmd = &cobra.Command{
 	Use:    "reconcile-unit",
-	Short:  "Rewrite the systemd unit to the current version and restart (internal)",
+	Short:  i18n.Text("Rewrite the systemd unit to the current version and restart (internal)"),
 	Hidden: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if os.Geteuid() != 0 {
@@ -464,7 +465,7 @@ var serviceReconcileUnitCmd = &cobra.Command{
 			recordReconcileFailure(fmt.Sprintf("reconcile subcommand: daemon-reload: %s", strings.TrimSpace(string(out))))
 			return fmt.Errorf("daemon-reload: %w: %s", err, strings.TrimSpace(string(out)))
 		}
-		fmt.Printf("Reconciled %s to unit version %d; restarting service.\n", linuxUnitDst, currentUnitVersion)
+		fmt.Printf(i18n.Text("Reconciled %s to unit version %d; restarting service.\n"), linuxUnitDst, currentUnitVersion)
 		// Restart so the relaxed sandbox applies to the live process. This kills
 		// the old agent; we run as a systemd-run transient service whose parent
 		// is PID 1 (not the agent), so this child survives to finish the restart.

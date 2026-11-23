@@ -2,6 +2,47 @@
 
 Tracking file for post-implementation feature verification results. Entries are logged most-recent-first.
 
+## Helper runtime branding and Agent localization (Phase 2 / PR #8277 design) — 2026-10-10
+
+**Branch:** `feat/6365-helper-branding-localization`
+**Commit:** Uncommitted implementation; base `4d46c8961af36a0c0a485936c3df64e89a184f5b`.
+**Tested by:** Codex, in an isolated development worktree.
+**Result:** PARTIAL — implementation checks below; native platform acceptance and live end-to-end verification pending.
+
+### What was tested
+- Helper frontend: TypeScript and Vite production build passed. Latest isolated branding suite: 7/7 passed, including strict hexadecimal colors and last-known/default runtime behavior.
+- Helper initial broad suite: 156 tests passed, one ChatView timeout and three worker-bootstrap errors. All affected files then obtained passing recovery evidence: AppShell 15/15, ChatView 11/11, RowMenu 4/4 and FilterChips 3/3. The final two files passed using standard threads/default isolation; intermediate vmThreads duplicate-DOM failures were preserved as harness evidence. No claim is made of a fresh single all-files green run.
+- Exact repository Rust branding/locale modules: 9/9 passed in a minimal dependency fixture; Windows GNU target `cargo check` passed without warnings. This does not validate the full Tauri crate, native IPC, or Windows runtime behavior.
+- Web initial scoped suite: 47/47 passed (policy detail 28, Helper tab 10, branding fields 9). Latest branding-only strict-color regression suite passed 9/9; Scoped web ESLint (five changed TypeScript/TSX files) exited 0. Its default-heap full typecheck hit Node OOM without TypeScript diagnostics; the guarded 3 GB retry also exhausted heap (~3032 MB), SIGABRT/exit 1, without emitting TypeScript diagnostics. Full web typechecking remains unverified.
+- API: all 263 unique cases in 13 scoped files have passing evidence. The first run passed 262/263; the additive preview fixture was corrected and the affected CRUD file then passed 51/51. New runtime resolution (9), preview authorization/inheritance (5), policy gates (8), HTTP branding (2), and assignments (23) passed. Shared validator: 17/17 passed, including LF/CRLF strict-color regressions; shared TypeScript check exited 0. Scoped API ESLint (19 changed TypeScript files) and API/shared diff checks exited 0. Full API typecheck exhausted the default Node heap (~2045 MB), SIGABRT/exit 1, without TypeScript diagnostics; the guarded 3 GB retry also exhausted heap (~3036 MB), SIGABRT/exit 1, without emitting TypeScript diagnostics. Full API typechecking remains unverified.
+- Agent pre-final-review race checks: all seven full affected packages passed (Helper 134, i18n 3, patching 173, userhelper 147, heartbeat 928, recoveryconsole 61, agentapp 223 top-level passes; total 1,669, with 13 skips). CLI help locale/fallback passed separately; focused reliability passed 13 top-level tests. All three Windows amd64/CGO-disabled binaries cross-compiled; existing GUI/CUI subsystem assertions passed. The full collectors package is not claimed green: its unrelated large-parser fixture timed out, while all focused reliability cases passed.
+
+### Issues found and limits
+- Strict hex validation initially accepted a trailing newline through JavaScript end-of-string matching; fixed with exact length plus schema validation and regression coverage.
+- Final CSS review bounded unbroken welcome titles/messages to available width in the username prompt and chat; the final Vite production build after this adjustment passed.
+- Local reenrollment now invalidates in-flight branding writes through a reset generation; manager spawn paths block unsafe persistence or generation mismatch. Watcher test deadlines were increased to 30 seconds under host contention; production retry behavior and assertions remain unchanged.
+- Initial Agent attempts exposed an unused import and Go 1.26 vet rules for dynamic no-argument formatting calls (fixed without changing output), missing libpcap headers (provided only in a task-local directory), an existing collector 15 MB regexp fixture timeout, and old watcher timing failures. The initial agentapp run timed out at 10 minutes in its existing cold Windows CUI-subsystem build; its GUI-subsystem test had advanced successfully. Preserve these failed-attempt logs separately from final-source results.
+- Full Tauri build was not available on this VPS (GTK/WebKit/pkg-config dependencies absent). No live isolated-stack/browser E2E was run under the available host resources. Production and unrelated worktrees/processes were not used.
+- Maintainer-required real Windows SCM 7031 verification of structured `Properties[0]` service display name with `CanonicalServiceName` remains pending. Compilation alone is not platform acceptance.
+
+### Final independent review
+- Independent API/shared/web review found no concrete source defects; database concurrency/RLS execution was not exercised.
+- Three Agent defects were corrected and independently re-reviewed: a reset during the whole Apply/update lifecycle could restore old branding; custom enrollment config paths reset the wrong Helper directory; the recovery refusal body retained an English paragraph in Portuguese output. Targeted regression evidence is recorded below.
+- Fresh post-review Agent race checks passed: full Helper package 135 top-level tests / 171 pass events (3 skips); scoped real enrollment 3/3; full recoveryconsole 62 top-level tests / 97 pass events. Go formatting and diff whitespace checks passed. All three Windows amd64/CGO-disabled binaries cross-compiled again from final source (exit 0). These checks validate the final fixes; the earlier seven-package run predates them.
+- Fresh post-review Helper regression suite passed 32/32 across App (7), AppShell (17), and branding (8), including Portuguese connection errors and stable high/critical severity keys. TypeScript and Vite production build also exited 0 after these final changes. React act warnings remain in the test log; no assertions failed.
+- Two Helper defects were corrected and independently re-reviewed: translated risk-tier CSS keys lost high/critical highlighting, and startup error screens depended on successful HTTP configuration before obtaining the local language. The existing get_helper_config command now adds local locale without changing operational fields; corrupt-config copy is localized. No new IPC command or operator locale override was introduced.
+- Removed infrastructure-identifying details from this entry; a final scan of changed and new files found no remaining known infrastructure identifiers. Final review does not replace pending platform acceptance or the unverified full API/web typechecks.
+
+### Evidence
+- `/tmp/helper-phase2-helper-{typecheck-final,build-final,branding-isolated-final,full-final,recovery-isolated,recovery-threads,build-recovery-final}.log`
+- `/tmp/helper-phase2-helper-locale-{focused-final,typecheck-final,build-final}.log`, `/tmp/helper-phase2-helper-locale-status.json`
+- `/tmp/helper-phase2-rust-{contract-verified,windows-verified}.log`
+- `/tmp/helper-phase2-web-tests-threads.log`, `/tmp/helper-phase2-web-branding-final.log`, `/tmp/helper-phase2-web-lint-final.log`, `/tmp/helper-phase2-web-typecheck-3072.log`
+- `/tmp/helper-phase2-api-typecheck-3072.log`, `/tmp/helper-phase2-api-lint.log`, `/tmp/helper-phase2-api-tests-threads.log`, `/tmp/helper-phase2-api-crud-rerun.log`, `/tmp/helper-phase2-api-shared17.log`, `/tmp/helper-phase2-api-shared-typecheck.log`
+- `/tmp/helper-phase2-agent-final-windows-build.{log,exit}`
+- `/tmp/helper-phase2-agent-final-{guard,enrollment,recovery}-race.{jsonl,exit}`, `/tmp/helper-phase2-agent-final-reviewfix-evidence.log`
+- `/tmp/helper-phase2-agent-regressions.jsonl`, `/tmp/helper-phase2-agent-agentapp-final.jsonl`, `/tmp/helper-phase2-agent-recovery-full.jsonl`, `/tmp/helper-phase2-agent-cli-help.jsonl`, `/tmp/helper-phase2-agent-reliability.jsonl`
+
 ## Hardware Lifecycle Report (PR #5701) — 2026-09-13
 
 **Branch:** `feature/hardware-lifecycle-report`

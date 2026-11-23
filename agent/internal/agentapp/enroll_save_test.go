@@ -122,3 +122,50 @@ func TestEnrollSaveFailureNamesDefaultConfigPath(t *testing.T) {
 		t.Errorf("friendly = %q still prints an empty path", failure.friendly)
 	}
 }
+
+func TestEnrollWithConfig_CustomPathClearsActualHelperHome(t *testing.T) {
+	quietEnrollForTest(t)
+	srv, _ := enrollTestServer(t)
+	machineDir, customDir := t.TempDir(), t.TempDir()
+	t.Cleanup(config.SetConfigDirForTest(machineDir))
+	old := []byte("branding:\n  state: set\n  scopeId: old\n  values:\n    displayName: Old tenant\n")
+	machineHelper := filepath.Join(machineDir, "helper_config.yaml")
+	customHelper := filepath.Join(customDir, "helper_config.yaml")
+	for _, p := range []string{machineHelper, customHelper} {
+		if err := os.WriteFile(p, old, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cfgPath := filepath.Join(customDir, "agent.yaml")
+	origSave := saveEnrollmentFn
+	t.Cleanup(func() { saveEnrollmentFn = origSave })
+	saved := false
+	saveEnrollmentFn = func(_ *config.Config, path string) error {
+		saved = true
+		if path != cfgPath {
+			t.Fatalf("save path changed: %q", path)
+		}
+		data, err := os.ReadFile(machineHelper)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(data), "branding:") {
+			t.Fatal("actual Helper home retained old branding before save")
+		}
+		if data, err := os.ReadFile(filepath.Join(machineDir, "helper_branding_generation")); err != nil || len(data) != 64 {
+			t.Fatalf("actual Manager generation not invalidated: %q %v", data, err)
+		}
+		return nil
+	}
+	cfg := config.Default()
+	cfg.ServerURL = srv.URL
+	if err := enrollWithConfig(cfg, cfgPath, "key", "secret"); err != nil {
+		t.Fatal(err)
+	}
+	if !saved {
+		t.Fatal("enrollment not saved")
+	}
+	if data, err := os.ReadFile(customHelper); err != nil || string(data) != string(old) {
+		t.Fatalf("unrelated custom-path helper config changed: %q %v", data, err)
+	}
+}

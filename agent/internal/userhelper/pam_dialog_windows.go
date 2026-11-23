@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"unsafe"
 
+	"github.com/breeze-rmm/agent/internal/i18n"
 	"github.com/breeze-rmm/agent/internal/ipc"
 )
 
@@ -56,7 +57,7 @@ func showPamDialog(req ipc.PamRequestDialog) ipc.PamDialogResult {
 }
 
 func showPamMessageBox(req ipc.PamRequestDialog) ipc.PamDialogResult {
-	title := syscall.StringToUTF16Ptr(pamDialogTitle)
+	title := syscall.StringToUTF16Ptr(i18n.Text(pamDialogTitle))
 	body := syscall.StringToUTF16Ptr(buildPamDialogBody(req))
 	flags := uintptr(mbYesNo | mbIconWarning | mbTopMost | mbSystemModal | mbSetForeground)
 
@@ -135,4 +136,3 @@ func (windowsPamDesktopOps) CloseDesktop(handle uintptr) error {
 	}
 	return nil
 }
-

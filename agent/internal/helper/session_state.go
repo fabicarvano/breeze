@@ -2,6 +2,7 @@ package helper
 
 import (
 	"path/filepath"
+	"reflect"
 	"time"
 )
 
@@ -60,7 +61,8 @@ func (s *sessionState) configUnchanged(cfg *Config) bool {
 		s.lastConfig.PortalUrl == cfg.PortalUrl &&
 		s.lastConfig.DeviceName == cfg.DeviceName &&
 		s.lastConfig.DeviceStatus == cfg.DeviceStatus &&
-		s.lastConfig.LastCheckin == cfg.LastCheckin
+		s.lastConfig.LastCheckin == cfg.LastCheckin &&
+		reflect.DeepEqual(s.lastConfig.Branding, cfg.Branding)
 }
 
 func (s *sessionState) refreshPID() {

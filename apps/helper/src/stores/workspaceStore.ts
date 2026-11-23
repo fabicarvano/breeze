@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n';
 import { create } from 'zustand';
 import { helperRequest, type AgentConfig } from '../lib/helperFetch';
 import { workspaceUrl } from '../lib/workspaceUrl';
@@ -294,7 +295,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       });
 
       if (!res.ok) {
-        set({ loading: false, error: parseErrorBody(res.body, 'Search is unavailable right now.') });
+        set({ loading: false, error: parseErrorBody(res.body, t(t("Search is unavailable right now."))) });
         return;
       }
 
@@ -303,7 +304,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     } catch (err) {
       set({
         loading: false,
-        error: err instanceof Error ? err.message : 'Search is unavailable right now.',
+        error: err instanceof Error ? err.message : t(t("Search is unavailable right now.")),
       });
     }
   },
@@ -326,7 +327,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       });
 
       if (!res.ok) {
-        set({ loading: false, error: parseErrorBody(res.body, "Couldn't open this folder.") });
+        set({ loading: false, error: parseErrorBody(res.body, t("Couldn't open this folder.")) });
         return;
       }
 
@@ -339,7 +340,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     } catch (err) {
       set({
         loading: false,
-        error: err instanceof Error ? err.message : "Couldn't open this folder.",
+        error: err instanceof Error ? err.message : t("Couldn't open this folder."),
       });
     }
   },
@@ -359,7 +360,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       });
 
       if (!res.ok) {
-        set({ loading: false, error: parseErrorBody(res.body, "Couldn't load recent files.") });
+        set({ loading: false, error: parseErrorBody(res.body, t("Couldn't load recent files.")) });
         return;
       }
 
@@ -371,7 +372,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     } catch (err) {
       set({
         loading: false,
-        error: err instanceof Error ? err.message : "Couldn't load recent files.",
+        error: err instanceof Error ? err.message : t("Couldn't load recent files."),
       });
     }
   },
@@ -408,7 +409,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         helperRequest(config, workspaceUrl(config, '/content/projects'), { method: 'GET' }),
       ]);
       if (!filingRes.ok) {
-        set({ loading: false, error: parseErrorBody(filingRes.body, "Couldn't load unfiled mail.") });
+        set({ loading: false, error: parseErrorBody(filingRes.body, t("Couldn't load unfiled mail.")) });
         return;
       }
       const filingData = JSON.parse(filingRes.body) as { filings?: FilingRecord[] };
@@ -423,7 +424,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     } catch (err) {
       set({
         loading: false,
-        error: err instanceof Error ? err.message : "Couldn't load unfiled mail.",
+        error: err instanceof Error ? err.message : t("Couldn't load unfiled mail."),
       });
     }
   },
@@ -439,7 +440,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         body: JSON.stringify({ fileIndexId, ...(helperUser ? { helperUser } : {}) }),
       });
       if (!res.ok) {
-        set({ filingBusy: null, error: parseErrorBody(res.body, "Couldn't sort this email.") });
+        set({ filingBusy: null, error: parseErrorBody(res.body, t("Couldn't sort this email.")) });
         return;
       }
       const data = JSON.parse(res.body) as { filing?: FilingRecord };
@@ -454,7 +455,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     } catch (err) {
       set({
         filingBusy: null,
-        error: err instanceof Error ? err.message : "Couldn't sort this email.",
+        error: err instanceof Error ? err.message : t("Couldn't sort this email."),
       });
     }
   },
@@ -474,7 +475,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         },
       );
       if (!res.ok) {
-        set({ filingBusy: null, error: parseErrorBody(res.body, "Couldn't move this email.") });
+        set({ filingBusy: null, error: parseErrorBody(res.body, t("Couldn't move this email.")) });
         return;
       }
       const data = JSON.parse(res.body) as { filing?: FilingRecord };
@@ -489,7 +490,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     } catch (err) {
       set({
         filingBusy: null,
-        error: err instanceof Error ? err.message : "Couldn't move this email.",
+        error: err instanceof Error ? err.message : t("Couldn't move this email."),
       });
     }
   },

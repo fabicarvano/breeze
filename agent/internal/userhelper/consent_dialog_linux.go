@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os/exec"
 
+	"github.com/breeze-rmm/agent/internal/i18n"
 	"github.com/breeze-rmm/agent/internal/ipc"
 )
 
@@ -24,8 +25,8 @@ func showConsentDialogOS(ctx context.Context, req ipc.ConsentRequest, presented 
 		"--question",
 		"--title", title,
 		"--text", body,
-		"--ok-label", "Allow",
-		"--cancel-label", "Deny",
+		"--ok-label", i18n.Text("Allow"),
+		"--cancel-label", i18n.Text("Deny"),
 	}
 	if req.TimeoutMs > 0 {
 		args = append(args, fmt.Sprintf("--timeout=%d", (req.TimeoutMs+999)/1000))

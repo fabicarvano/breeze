@@ -63,3 +63,26 @@ func TestClassifyBrandedAgentFailureReportsFixedName(t *testing.T) {
 		t.Fatalf("ServiceName = %q, want %q", got, "BreezeAgent")
 	}
 }
+
+func TestSCM7031UsesStructuredDisplayNameRegardlessOfLocale(t *testing.T) {
+	restore := branding.SetForTest(branding.Values{AgentServiceDisplayName: "Example MSP Agent", WatchdogServiceDisplayName: "Example MSP Watchdog"})
+	defer restore()
+	for _, name := range []struct{ display, want string }{
+		{"Example MSP Agent", "BreezeAgent"}, {"Example MSP Watchdog", "BreezeWatchdog"}, {"Spooler", "Spooler"},
+	} {
+		for _, message := range []string{
+			"O serviço terminou inesperadamente.",
+			"Der Dienst wurde unerwartet beendet.",
+			"The misleading service terminated unexpectedly.",
+		} {
+			metrics := &ReliabilityMetrics{}
+			classifyEventLogEntry(metrics, EventLogEntry{
+				Source: "Service Control Manager", EventID: "7031:1", Message: message,
+				Details: map[string]any{"eventId": 7031, "serviceDisplayName": name.display},
+			})
+			if len(metrics.ServiceFailures) != 1 || metrics.ServiceFailures[0].ServiceName != name.want {
+				t.Fatalf("%+v", metrics.ServiceFailures)
+			}
+		}
+	}
+}

@@ -22,6 +22,7 @@ vi.mock('../db', () => ({
     update: vi.fn(),
     delete: vi.fn(),
     transaction: vi.fn(),
+    execute: vi.fn(),
   },
   runOutsideDbContext: vi.fn(async (fn: () => Promise<unknown>) => fn()),
   withDbAccessContext: vi.fn(async (_ctx: unknown, fn: () => Promise<unknown>) => fn()),
@@ -61,10 +62,11 @@ describe('configuration policy caller transaction', () => {
       insert: vi.fn(() => chain([row])),
       update: vi.fn(() => chain([row])),
       delete: vi.fn(() => chain([])),
+      execute: vi.fn().mockResolvedValue([]),
       transaction: vi.fn((fn: (nested: unknown) => unknown) => fn(tx)),
     };
     await invoke(tx);
-    for (const method of ['select', 'insert', 'update', 'delete', 'transaction'] as const) {
+    for (const method of ['select', 'insert', 'update', 'delete', 'transaction', 'execute'] as const) {
       expect(db[method]).not.toHaveBeenCalled();
     }
     expect(tx.select.mock.calls.length + tx.insert.mock.calls.length + tx.update.mock.calls.length).toBeGreaterThan(0);
