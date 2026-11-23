@@ -1,0 +1,9 @@
+Development temporarily paused
+
+On 2026-11-23, development on this fork was temporarily paused due to strategic guidelines.
+
+All work in progress has been preserved in this fork, in the feat/*, fix/*, docs/* and wip/* branches. Nothing has been discarded. The wip/*-20261123 branches hold whatever was uncommitted or unpushed at the time of the pause.
+
+Open contributions to the upstream project (LanternOps/breeze) are left as they are, with no further action until development resumes.
+
+Development will resume when the strategic guidelines allow it. Until then, this fork should not be considered active.
